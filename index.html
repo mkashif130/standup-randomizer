@@ -113,9 +113,9 @@
   </div>
 
   <script>
-    // ===== Analytics (Google Sheets) =====
-const ANALYTICS_URL   = 'https://script.google.com/macros/s/AKfycbzwas6xXC-vK4L_Of4p8pGcG6a8g86u5_uug2AO_adnObsygHl0Gg-sWtBAFIkRvVFc/exec';
-const ANALYTICS_TOKEN = 'AKfycbzwas6xXC-vK4L_Of4p8pGcG6a8g86u5_uug2AO_adnObsygHl0Gg-sWtBAFIkRvVFc';
+// ===== Analytics (Google Sheets) =====
+const ANALYTICS_URL   = 'https://script.google.com/macros/s/AKfycbxHUvZBtHxlR6Qssr1N0hAtJhENCY1jqx4XI-lcwwy2b9Ej3rx9VJNbNqICvam6VoSZ/exec';
+const ANALYTICS_TOKEN = '';           // optional; keep '' if you didn't set one in Apps Script
 const APP_VERSION     = '1.0.0';
 
 function getClientId(){
@@ -133,7 +133,7 @@ function track(event, payload = {}) {
     event,
     date,
     client_id: cid,
-    session_id: `${date}:${cid}`,
+    session_id: `${date}:${cid}`,   // we are NOT deduping
     team,
     payload,
     app_version: APP_VERSION
@@ -155,7 +155,7 @@ async function flushEventQueue(){
     while (q.length) {
       const ev = q[0];
       const ok = await sendEvent(ev);
-      if (!ok) break;   // stop if failed; will retry later
+      if (!ok) break;
       q.shift();
     }
   } finally {
@@ -164,21 +164,17 @@ async function flushEventQueue(){
 }
 
 function sendEvent(ev){
-  // Prefer Beacon (non-blocking, no preflight), fallback to no-cors fetch
   if (navigator.sendBeacon) {
     const blob = new Blob([JSON.stringify(ev)], { type: 'text/plain' });
     const ok = navigator.sendBeacon(ANALYTICS_URL, blob);
     return Promise.resolve(ok);
   }
-  return fetch(ANALYTICS_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    // no custom headers → avoid CORS preflight
-    body: JSON.stringify(ev)
-  }).then(() => true).catch(() => false);
+  return fetch(ANALYTICS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(ev) })
+    .then(() => true)
+    .catch(() => false);
 }
-
 window.addEventListener('online', flushEventQueue);
+
 
     // ===== Utilities =====
     const $ = (sel) => document.querySelector(sel);
@@ -230,10 +226,7 @@ window.addEventListener('online', flushEventQueue);
         state = { teams: { [id]: emptyTeam(id, 'My Team') }, currentTeamId: id };
         save();
       }
-      // After state load/creation, add:
-const _last = localStorage.getItem('standup_last_session_date');
-const _today = todayISO();
-  track('session');
+
 
     }
     function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
@@ -278,7 +271,13 @@ const _today = todayISO();
     }
     window.newTeam = newTeam; window.renameTeam = renameTeam; window.deleteTeam = deleteTeam;
 
-    function switchTeam(id){ state.currentTeamId = id; save(); renderAll(); }
+ function switchTeam(id){
+  state.currentTeamId = id;
+  save();
+  renderAll();
+  track('session_start', { teamId: id, teamName: (state.teams[id]?.name) || '' });
+}
+
 
     // ===== Member Ops =====
     function addMember(name){
@@ -392,6 +391,7 @@ track('meeting_started', {
   deterministic: !!document.getElementById('deterministic').checked
 });
 
+
     }
 
     function resetOrder(){
@@ -444,12 +444,14 @@ track('meeting_started', {
         save(); renderTimer();
       } else {
   t.timer.running=false;
-  const dur = Math.round(((performance.now() - (t.timer.meetingStartedAt || performance.now())) / 1000));
-  track('meeting_completed', {
-    count: t.order.list.length,
-    durationSec: isFinite(dur) ? dur : null
-  });
+
   save(); renderTimer(); toast('All done','ok');
+        const dur = Math.round(((performance.now() - (t.timer.meetingStartedAt || performance.now())) / 1000));
+track('meeting_completed', {
+  count: t.order.list.length,
+  durationSec: isFinite(dur) ? dur : null
+});
+
 }
     }
 
@@ -600,6 +602,17 @@ track('meeting_started', {
     load();
     bindEvents();
     renderAll();
+    // ===== Init =====
+load();
+bindEvents();
+renderAll();
+
+// Log every page load as a session (no dedupe)
+track('session_start', {
+  teamId: state.currentTeamId,
+  teamName: (currentTeam()?.name) || ''
+});
+
   </script>
 </body>
 </html>
