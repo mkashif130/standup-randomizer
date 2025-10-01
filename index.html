@@ -113,6 +113,73 @@
   </div>
 
   <script>
+    // ===== Analytics (Google Sheets) =====
+const ANALYTICS_URL   = 'https://script.google.com/macros/s/AKfycbzwas6xXC-vK4L_Of4p8pGcG6a8g86u5_uug2AO_adnObsygHl0Gg-sWtBAFIkRvVFc/exec';
+const ANALYTICS_TOKEN = 'AKfycbzwas6xXC-vK4L_Of4p8pGcG6a8g86u5_uug2AO_adnObsygHl0Gg-sWtBAFIkRvVFc';
+const APP_VERSION     = '1.0.0';
+
+function getClientId(){
+  let id = localStorage.getItem('standup_client_id');
+  if (!id) { id = 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('standup_client_id', id); }
+  return id;
+}
+
+function track(event, payload = {}) {
+  const cid   = getClientId();
+  const date  = todayISO();
+  const team  = (typeof currentTeam === 'function' && currentTeam()) ? (currentTeam().name || '') : '';
+  const body  = {
+    token: ANALYTICS_TOKEN,
+    event,
+    date,
+    client_id: cid,
+    session_id: `${date}:${cid}`,
+    team,
+    payload,
+    app_version: APP_VERSION
+  };
+  enqueueEvent(body);
+  flushEventQueue();
+}
+
+function enqueueEvent(ev){
+  const q = JSON.parse(localStorage.getItem('standup_evt_q') || '[]');
+  q.push(ev);
+  localStorage.setItem('standup_evt_q', JSON.stringify(q));
+}
+
+async function flushEventQueue(){
+  let q = JSON.parse(localStorage.getItem('standup_evt_q') || '[]');
+  if (!q.length) return;
+  try {
+    while (q.length) {
+      const ev = q[0];
+      const ok = await sendEvent(ev);
+      if (!ok) break;   // stop if failed; will retry later
+      q.shift();
+    }
+  } finally {
+    localStorage.setItem('standup_evt_q', JSON.stringify(q));
+  }
+}
+
+function sendEvent(ev){
+  // Prefer Beacon (non-blocking, no preflight), fallback to no-cors fetch
+  if (navigator.sendBeacon) {
+    const blob = new Blob([JSON.stringify(ev)], { type: 'text/plain' });
+    const ok = navigator.sendBeacon(ANALYTICS_URL, blob);
+    return Promise.resolve(ok);
+  }
+  return fetch(ANALYTICS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    // no custom headers → avoid CORS preflight
+    body: JSON.stringify(ev)
+  }).then(() => true).catch(() => false);
+}
+
+window.addEventListener('online', flushEventQueue);
+
     // ===== Utilities =====
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -163,6 +230,11 @@
         state = { teams: { [id]: emptyTeam(id, 'My Team') }, currentTeamId: id };
         save();
       }
+      // After state load/creation, add:
+const _last = localStorage.getItem('standup_last_session_date');
+const _today = todayISO();
+  track('session');
+
     }
     function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 
@@ -182,6 +254,8 @@
       save();
       renderAll();
       toast('Team created', 'ok');
+      track('team_created', { name: name.trim() });
+
     }
     function renameTeam(){
       const t = currentTeam(); if(!t) return;
@@ -311,6 +385,13 @@
       t.timer.index = 0; t.timer.running=false; t.timer.remaining = null; t.timer.lastTick=null;
       save();
       renderOrder(); renderTimer();
+      t.timer.meetingStartedAt = performance.now();
+track('meeting_started', {
+  count: orderIds.length,
+  roles: t.order.roles || {},
+  deterministic: !!document.getElementById('deterministic').checked
+});
+
     }
 
     function resetOrder(){
@@ -362,8 +443,14 @@
         t.timer.running = false; // require manual start
         save(); renderTimer();
       } else {
-        t.timer.running=false; save(); renderTimer(); toast('All done','ok');
-      }
+  t.timer.running=false;
+  const dur = Math.round(((performance.now() - (t.timer.meetingStartedAt || performance.now())) / 1000));
+  track('meeting_completed', {
+    count: t.order.list.length,
+    durationSec: isFinite(dur) ? dur : null
+  });
+  save(); renderTimer(); toast('All done','ok');
+}
     }
 
     function resetTimer(){
