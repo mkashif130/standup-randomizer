@@ -127,6 +127,25 @@
       Copy All Notes Today
     </button>
   </div>
+  <div class="mt-2 flex items-center gap-2">
+  <button id="micToggleBtn"
+    class="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600">
+    🎙️ Start Mic
+  </button>
+  <select id="micLang"
+    class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <option value="en-US">English (US)</option>
+    <option value="en-GB">English (UK)</option>
+    <option value="hi-IN">Hindi (India)</option>
+    <option value="ar-AE">Arabic (UAE)</option>
+    <option value="es-ES">Spanish (Spain)</option>
+    <option value="fr-FR">French</option>
+    <option value="de-DE">German</option>
+    <!-- add/adjust to your audience -->
+  </select>
+  <span class="text-xs text-slate-500">Live speech → notes</span>
+</div>
+
 </div>
 
       </section>
@@ -713,6 +732,20 @@ if (clearBtn) clearBtn.addEventListener('click', ()=>{
 });
 const copyAllBtn = document.getElementById('copyMeetingNotesBtn');
 if (copyAllBtn) copyAllBtn.addEventListener('click', copyAllNotesToday);
+// Mic controls
+const micBtn = document.getElementById('micToggleBtn');
+if (micBtn) micBtn.addEventListener('click', () => mic.active ? stopMic() : startMic());
+
+const micLangSel = document.getElementById('micLang');
+if (micLangSel) {
+  // set current language
+  micLangSel.value = mic.lang;
+  micLangSel.addEventListener('change', (e) => {
+    mic.lang = e.target.value;
+    localStorage.setItem('standup_mic_lang', mic.lang);
+    if (mic.active) { stopMic(); startMic(); } // restart with new language
+  });
+}
 
     }
 
@@ -742,6 +775,93 @@ track('session_start', {
   teamId: state.currentTeamId,
   teamName: (currentTeam()?.name) || ''
 });
+
+    // ===== Live mic → Notes (Web Speech API) =====
+let mic = {
+  active: false,
+  rec: null,
+  lang: localStorage.getItem('standup_mic_lang') || (navigator.language || 'en-US')
+};
+
+function isSpeechApiSupported(){
+  return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+}
+
+function createRecognizer(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.lang = mic.lang;
+  rec.continuous = true;        // keep listening
+  rec.interimResults = true;    // we’ll only commit final results
+  rec.maxAlternatives = 1;
+
+  rec.onresult = (e) => {
+    let finalText = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const res = e.results[i];
+      if (res.isFinal) finalText += res[0].transcript + ' ';
+    }
+    if (finalText.trim().length) appendToNotes(finalText);
+  };
+
+  rec.onerror = (evt) => {
+    toast(`Mic error: ${evt.error}`, 'error');
+  };
+
+  rec.onend = () => {
+    // some browsers stop after a while—auto-restart if still active
+    if (mic.active) {
+      try { rec.start(); } catch (_) {}
+    }
+  };
+
+  return rec;
+}
+
+function appendToNotes(text){
+  const ta = document.getElementById('notesTextarea');
+  if (!ta) return;
+
+  // Optional: prefix with current speaker if textarea is empty
+  const t = currentTeam();
+  const sp = getCurrentSpeakerId?.();
+  const name = sp ? (t.members.find(x => x.id === sp)?.name || '') : '';
+
+  if (!ta.value.trim() && name) {
+    ta.value = `${name}: ${text.trim()} `;
+  } else {
+    ta.value = (ta.value + (ta.value.endsWith(' ') ? '' : ' ') + text.trim() + ' ');
+  }
+  // persist via your existing notes flow
+  if (typeof setCurrentNote === 'function') setCurrentNote(ta.value);
+}
+
+function startMic(){
+  if (!isSpeechApiSupported()) {
+    toast('Speech to text not supported in this browser', 'error');
+    return;
+  }
+  if (mic.rec) { try { mic.rec.stop(); } catch (_) {} }
+
+  mic.active = true;
+  mic.rec = createRecognizer();
+  try {
+    mic.rec.start();
+    toast('Mic on', 'ok');
+    const btn = document.getElementById('micToggleBtn');
+    if (btn) btn.textContent = '⏸︎ Stop Mic';
+  } catch (e) {
+    toast('Could not start mic', 'error');
+  }
+}
+
+function stopMic(){
+  mic.active = false;
+  if (mic.rec) { try { mic.rec.stop(); } catch (_) {} }
+  const btn = document.getElementById('micToggleBtn');
+  if (btn) btn.textContent = '🎙️ Start Mic';
+}
+
 
   </script>
 </body>
