@@ -733,6 +733,14 @@ if (clearBtn) clearBtn.addEventListener('click', ()=>{
 const copyAllBtn = document.getElementById('copyMeetingNotesBtn');
 if (copyAllBtn) copyAllBtn.addEventListener('click', copyAllNotesToday);
 // Mic controls
+      // ===== Mic state (declare early to avoid TDZ) =====
+var mic = window.mic || {
+  active: false,
+  rec: null,
+  lang: localStorage.getItem('standup_mic_lang') || (navigator.language || 'en-US')
+};
+window.mic = mic; // keep a single global
+
 const micBtn = document.getElementById('micToggleBtn');
 if (micBtn) micBtn.addEventListener('click', () => mic.active ? stopMic() : startMic());
 
@@ -776,12 +784,7 @@ track('session_start', {
   teamName: (currentTeam()?.name) || ''
 });
 
-    // ===== Live mic → Notes (Web Speech API) =====
-let mic = {
-  active: false,
-  rec: null,
-  lang: localStorage.getItem('standup_mic_lang') || (navigator.language || 'en-US')
-};
+
 
 function isSpeechApiSupported(){
   return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
