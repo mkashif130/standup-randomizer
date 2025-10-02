@@ -106,6 +106,29 @@
             <button id="resetBtn" class="px-3 py-2 text-sm rounded-lg bg-slate-800 text-white hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-800">Reset</button>
           </div>
         </div>
+
+        <!-- Notes -->
+<div class="mt-4 border border-slate-200 rounded-xl p-4 bg-slate-50">
+  <div class="flex items-center justify-between mb-2">
+    <h3 class="text-sm font-medium text-slate-700">Notes for current speaker</h3>
+    <div class="text-xs text-slate-500" id="notesMeta"></div>
+  </div>
+  <textarea id="notesTextarea" rows="5"
+    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+    placeholder="Type notes here…"></textarea>
+  <div class="mt-2 flex gap-2">
+    <button id="copyNotesBtn" class="px-3 py-2 text-sm rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">
+      Copy Note
+    </button>
+    <button id="clearNotesBtn" class="px-3 py-2 text-sm rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200">
+      Clear Note
+    </button>
+    <button id="copyMeetingNotesBtn" class="ml-auto px-3 py-2 text-sm rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">
+      Copy All Notes Today
+    </button>
+  </div>
+</div>
+
       </section>
     </div>
 
@@ -231,9 +254,16 @@ window.addEventListener('online', flushEventQueue);
     }
     function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 
-    function emptyTeam(id, name){
-      return { id, name, members: [], order: { date: '', list: [], roles: {}, firstHistory: {} }, timer: { per:60, index:0, remaining:null, running:false, lastTick:null } };
-    }
+  function emptyTeam(id, name){
+  return {
+    id, name,
+    members: [],
+    order: { date: '', list: [], roles: {}, firstHistory: {} },
+    timer: { per:60, index:0, remaining:null, running:false, lastTick:null },
+    notes: {} // <-- date -> { memberId: "note text" }
+  };
+}
+
 
     function currentTeam(){ return state.teams[state.currentTeamId]; }
 
@@ -466,6 +496,67 @@ track('meeting_completed', {
       t.timer.per = n; if(t.timer.remaining==null) t.timer.remaining = n; save(); renderTimerDisplay();
     }
 
+    // ===== Notes helpers =====
+function ensureNotes(date){
+  const t = currentTeam();
+  if (!t.notes) t.notes = {};
+  if (!t.notes[date]) t.notes[date] = {};
+  return t.notes[date];
+}
+function getCurrentSpeakerId(){
+  const t = currentTeam();
+  return (t.order?.list || [])[t.timer.index || 0];
+}
+function renderNotes(){
+  const t = currentTeam();
+  const date = t.order?.date || todayISO();
+  ensureNotes(date);
+  const sp = getCurrentSpeakerId();
+  const name = sp ? (t.members.find(x=>x.id===sp)?.name || '—') : '—';
+  const note = (t.notes[date] && t.notes[date][sp]) || '';
+  const meta = document.getElementById('notesMeta');
+  const ta = document.getElementById('notesTextarea');
+  if (meta) meta.textContent = date + (name !== '—' ? ` • ${name}` : '');
+  if (ta) ta.value = note;
+}
+function setCurrentNote(val){
+  const t = currentTeam();
+  const date = t.order?.date || todayISO();
+  ensureNotes(date);
+  const sp = getCurrentSpeakerId();
+  if (!sp) return;
+  t.notes[date][sp] = val;
+  save();
+  // refresh badges in order list
+  renderOrder();
+}
+function copySpeakerNote(memberId){
+  const t = currentTeam();
+  const date = t.order?.date || todayISO();
+  const name = t.members.find(m=>m.id===memberId)?.name || '—';
+  const note = (t.notes?.[date]?.[memberId]) || '';
+  const text = `${name} (${date})\n${note || ''}`;
+  navigator.clipboard.writeText(text)
+    .then(()=> toast('Copied','ok'))
+    .catch(()=> toast('Copy failed','error'));
+}
+function copyAllNotesToday(){
+  const t = currentTeam();
+  const date = t.order?.date || todayISO();
+  const day = t.notes?.[date] || {};
+  const lines = (t.order?.list || []).map(id => {
+    const nm = t.members.find(m=>m.id===id)?.name || id;
+    const nv = (day[id] || '').trim();
+    return `${nm}: ${nv}`;
+  }).join('\n');
+  navigator.clipboard.writeText(lines)
+    .then(()=> toast('Copied','ok'))
+    .catch(()=> toast('Copy failed','error'));
+}
+// tiny debounce helper
+function debounce(fn, wait){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a), wait); }; }
+
+
     // ===== Rendering =====
     function renderTeams(){
       const sel = $('#teamSelect'); sel.innerHTML = '';
@@ -515,21 +606,35 @@ track('meeting_completed', {
     }
 
     function renderOrder(){
-      const t = currentTeam(); const ol = $('#orderList'); ol.innerHTML='';
-      const list = t.order?.list || [];
-      const roles = t.order?.roles || {};
-      list.forEach((id, idx)=>{
-        const m = t.members.find(x=>x.id===id); if(!m) return;
-        const li = document.createElement('li'); li.className='';
-        const roleBadges = [];
-        if(roles.facilitator===id) roleBadges.push('<span class="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">Facilitator</span>');
-        if(roles.noteTaker===id) roleBadges.push('<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">Note‑taker</span>');
-        if(roles.demo===id) roleBadges.push('<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">Demo</span>');
-        li.innerHTML = `<span>${escapeHtml(m.name)}</span>${roleBadges.join('')}`;
-        ol.appendChild(li);
-      });
-      $('#todayLabel').textContent = t.order?.date ? `For ${t.order.date}` : '—';
-      renderTimer();
+        const t = currentTeam();
+  const ol = $('#orderList'); ol.innerHTML='';
+  const list = t.order?.list || [];
+  const roles = t.order?.roles || {};
+  const date = t.order?.date || todayISO();
+
+  list.forEach((id)=>{
+    const m = t.members.find(x=>x.id===id); if(!m) return;
+    const roleBadges = [];
+    if(roles.facilitator===id) roleBadges.push('<span class="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">Facilitator</span>');
+    if(roles.noteTaker===id)   roleBadges.push('<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">Note-taker</span>');
+    if(roles.demo===id)        roleBadges.push('<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">Demo</span>');
+
+    const hasNote = (t.notes && t.notes[date] && t.notes[date][id] && t.notes[date][id].trim().length>0);
+    const noteBadge = hasNote ? '<span class="ml-1.5 text-[10px] px-1 rounded bg-slate-200 text-slate-700">📝</span>' : '';
+
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <div class="flex items-center justify-between gap-2">
+        <div><span>${escapeHtml(m.name)}</span>${roleBadges.join('')}${noteBadge}</div>
+        <button class="text-xs px-2 py-1 border border-slate-300 rounded hover:bg-slate-100"
+          title="Copy ${escapeHtml(m.name)}'s note"
+          onclick="copySpeakerNote('${id}')">Copy note</button>
+      </div>
+    `;
+    ol.appendChild(li);
+  });
+  $('#todayLabel').textContent = t.order?.date ? `For ${t.order.date}` : '—';
+  renderTimer(); // keep timer in sync
     }
 
     function renderTimer(){
@@ -543,6 +648,8 @@ track('meeting_completed', {
       if(t.timer.remaining==null) t.timer.remaining = t.timer.per || 60;
       renderTimerDisplay();
       $('#startPauseBtn').textContent = t.timer.running ? 'Pause' : 'Start';
+      renderNotes();
+
     }
 
     function renderTimerDisplay(){
@@ -584,6 +691,29 @@ track('meeting_completed', {
           const t = currentTeam(); if(!t.options) t.options={}; t.options[id]=document.getElementById(id).checked; save();
         });
       });
+
+      // Notes panel
+const debounced = debounce((val)=> setCurrentNote(val), 300);
+const ta = document.getElementById('notesTextarea');
+if (ta) ta.addEventListener('input', (e)=> debounced(e.target.value));
+const copyBtn = document.getElementById('copyNotesBtn');
+if (copyBtn) copyBtn.addEventListener('click', ()=>{
+  const t = currentTeam();
+  const date = t.order?.date || todayISO();
+  const sp = getCurrentSpeakerId();
+  const name = sp ? (t.members.find(x=>x.id===sp)?.name || '—') : '—';
+  const text = `${name} (${date})\n${document.getElementById('notesTextarea').value}`;
+  navigator.clipboard.writeText(text).then(()=> toast('Copied','ok')).catch(()=> toast('Copy failed','error'));
+});
+const clearBtn = document.getElementById('clearNotesBtn');
+if (clearBtn) clearBtn.addEventListener('click', ()=>{
+  document.getElementById('notesTextarea').value = '';
+  setCurrentNote('');
+  toast('Deleted','ok');
+});
+const copyAllBtn = document.getElementById('copyMeetingNotesBtn');
+if (copyAllBtn) copyAllBtn.addEventListener('click', copyAllNotesToday);
+
     }
 
     function restoreOptions(){
