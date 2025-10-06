@@ -3,869 +3,319 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stand‑up Randomizer</title>
-  <!-- Tailwind CSS CDN -->
+  <title>Stand‑up Randomizer — ultra‑minimal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    :root{--ring:rgba(59,130,246,.5)}
     html,body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    /* Toast container */
     #toastWrap{position:fixed;top:12px;right:12px;z-index:50;display:flex;flex-direction:column;gap:.5rem}
-    .toast{animation:fadeSlide .25s ease-out;}
+    .toast{animation:fadeSlide .25s ease-out}
     @keyframes fadeSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-    /* Chip X button look */
-    .chip-x{display:inline-flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;border-radius:.375rem;border:1px solid rgb(203 213 225);background:white;transition:.15s;}
+    .chip-x{display:inline-flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;border-radius:.375rem;border:1px solid rgb(203 213 225);background:white;transition:.15s}
     .chip-x:hover{background:rgb(248 250 252)}
-    .chip-x:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
+    .chip-x:focus-visible{outline:2px solid rgba(59,130,246,.5);outline-offset:1px}
     .chip{gap:.375rem}
+    .pill{border:1px solid rgb(226 232 240)}
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
-  <!-- Toasts -->
   <div id="toastWrap"></div>
 
-  <div class="max-w-5xl mx-auto p-4 md:p-6 lg:p-8">
-    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-      <h1 class="text-2xl md:text-3xl font-semibold">Stand‑up Randomizer</h1>
-      <div class="flex items-center gap-2">
-        <select id="teamSelect" class="w-56 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Select team"></select>
-        <button class="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500" onclick="newTeam()">New</button>
-        <button class="px-3 py-2 text-sm rounded-lg bg-slate-800 text-white hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-800" onclick="renameTeam()">Rename</button>
-        <button class="px-3 py-2 text-sm rounded-lg bg-rose-600 text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-rose-600" onclick="deleteTeam()">Delete</button>
+  <!-- Header (no action buttons) -->
+  <header class="max-w-4xl mx-auto px-4 pt-5 pb-2 flex items-center justify-between gap-2">
+    <h1 class="text-xl md:text-2xl font-semibold">Stand‑up</h1>
+    <select id="teamSelect" class="w-48 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Select team"></select>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-4xl mx-auto px-4 pb-10">
+    <!-- Add + chips -->
+    <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+      <input id="memberInput" type="text" placeholder="Add names — paste comma or newline list, then Enter" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Add member(s)" />
+      <div id="memberChips" class="mt-3 flex flex-wrap gap-2"></div>
+    </section>
+
+    <!-- Order only (hidden until members added) -->
+    <section id="orderCard" class="mt-4 hidden">
+      <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <div class="flex items-center justify-between gap-2">
+          <div class="text-sm text-slate-500 select-none cursor-pointer" id="todayLabel" title="Shuffle (S)">—</div>
+          <button id="shuffleBtn" class="px-2 py-1 text-xs rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300" title="Shuffle (S)">🎲 Shuffle</button>
+        </div>
+        <ul id="queueList" class="mt-3 divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-white"></ul>
+
+        <!-- Manual notes toggle + area (hidden until checked) -->
+        <div class="mt-3 flex items-center gap-2">
+          <label class="inline-flex items-center gap-2 text-sm select-none">
+            <input id="notesToggle" type="checkbox" class="rounded border-slate-300">
+            Take manual notes
+          </label>
+        </div>
+        <div id="notesWrap" class="mt-2 hidden">
+          <textarea id="notesArea" rows="5" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Meeting notes for today…"></textarea>
+        </div>
       </div>
-    </header>
+    </section>
+  </main>
 
-    <!-- Panels grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Members & Attendance -->
-      <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-6">
-        <h2 class="text-lg font-semibold mb-4">Members & Attendance</h2>
-        <div class="flex flex-col md:flex-row gap-3 mb-3">
-          <input id="memberInput" type="text" placeholder="Add member (Enter)" class="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Add single member" />
-          <button id="addMemberBtn" class="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">Add</button>
-        </div>
-        <details class="mb-4">
-          <summary class="cursor-pointer text-sm text-slate-600 hover:text-slate-800">Bulk add (comma or newline separated)</summary>
-          <div class="mt-2">
-            <textarea id="bulkInput" rows="3" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Alice, Bob, Charlie"></textarea>
-            <div class="mt-2 flex gap-2">
-              <button id="bulkAddBtn" class="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">Add All</button>
-              <button id="bulkClearBtn" class="px-3 py-2 text-sm rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 rounded-lg">Clear</button>
-            </div>
-          </div>
-        </details>
-
-        <div id="memberChips" class="flex flex-wrap gap-2"></div>
-
-        <div class="mt-4">
-          <h3 class="text-sm font-medium text-slate-700 mb-2">Attendance (skip without deleting)</h3>
-          <ul id="attendanceList" class="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-slate-50"></ul>
-        </div>
-      </section>
-
-      <!-- Order, Roles & Timer -->
-      <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold">Today's Order & Timer</h2>
-          <div class="text-sm text-slate-500" id="todayLabel"></div>
-        </div>
-
-        <!-- Randomize options -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-          <label class="flex items-center gap-2 text-sm"><input id="deterministic" type="checkbox" class="rounded border-slate-300"> Deterministic by date</label>
-          <label class="flex items-center gap-2 text-sm"><input id="avoidRepeatFirst" type="checkbox" class="rounded border-slate-300" checked> Avoid repeating yesterday's first</label>
-          <label class="flex items-center gap-2 text-sm"><input id="roleFac" type="checkbox" class="rounded border-slate-300"> Assign Facilitator</label>
-          <label class="flex items-center gap-2 text-sm"><input id="roleNote" type="checkbox" class="rounded border-slate-300"> Assign Note‑taker</label>
-          <label class="flex items-center gap-2 text-sm"><input id="roleDemo" type="checkbox" class="rounded border-slate-300"> Assign Demo</label>
-        </div>
-
-        <div class="flex flex-wrap gap-2 mb-4">
-          <button id="randomizeBtn" class="px-3 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-600">Randomize Order</button>
-          <button id="copyOrderBtn" class="px-3 py-2 text-sm rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">Copy Order</button>
-          <button id="resetOrderBtn" class="px-3 py-2 text-sm rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">Reset Order</button>
-        </div>
-
-        <ol id="orderList" class="list-decimal pl-5 space-y-1 mb-6"></ol>
-
-        <!-- Timer Controls -->
-        <div class="border border-slate-200 rounded-xl p-4">
-          <div class="flex items-center justify-between gap-3 mb-3">
-            <div class="text-sm text-slate-600">Per‑person seconds:</div>
-            <input id="secondsInput" type="number" min="10" step="5" value="60" class="w-24 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div class="flex items-center justify-between gap-3 mb-4">
-            <div class="text-xl font-semibold" id="currentSpeaker">—</div>
-            <div class="text-3xl tabular-nums" id="timerDisplay">00:60</div>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="startPauseBtn" class="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">Start</button>
-            <button id="nextBtn" class="px-3 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-600">Next</button>
-            <button id="resetBtn" class="px-3 py-2 text-sm rounded-lg bg-slate-800 text-white hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-800">Reset</button>
-          </div>
-        </div>
-
-        <!-- Notes -->
-<div class="mt-4 border border-slate-200 rounded-xl p-4 bg-slate-50">
-  <div class="flex items-center justify-between mb-2">
-    <h3 class="text-sm font-medium text-slate-700">Notes for current speaker</h3>
-    <div class="text-xs text-slate-500" id="notesMeta"></div>
-  </div>
-  <textarea id="notesTextarea" rows="5"
-    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-    placeholder="Type notes here…"></textarea>
-  <div class="mt-2 flex gap-2">
-    <button id="copyNotesBtn" class="px-3 py-2 text-sm rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">
-      Copy Note
-    </button>
-    <button id="clearNotesBtn" class="px-3 py-2 text-sm rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200">
-      Clear Note
-    </button>
-    <button id="copyMeetingNotesBtn" class="ml-auto px-3 py-2 text-sm rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">
-      Copy All Notes Today
-    </button>
-  </div>
-  <div class="mt-2 flex items-center gap-2">
-  <button id="micToggleBtn"
-    class="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600">
-    🎙️ Start Mic
-  </button>
-  <select id="micLang"
-    class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-    <option value="en-US">English (US)</option>
-    <option value="en-GB">English (UK)</option>
-    <option value="hi-IN">Hindi (India)</option>
-    <option value="ar-AE">Arabic (UAE)</option>
-    <option value="es-ES">Spanish (Spain)</option>
-    <option value="fr-FR">French</option>
-    <option value="de-DE">German</option>
-    <!-- add/adjust to your audience -->
-  </select>
-  <span class="text-xs text-slate-500">Live speech → notes</span>
-</div>
-
-</div>
-
-      </section>
-    </div>
-
-    <footer class="mt-8 text-center text-xs text-slate-500">No sign‑in. Everything is stored locally in your browser.</footer>
-  </div>
+  <footer class="pb-10 text-center text-[10px] text-slate-500">Shortcuts: Ctrl+N (new team), F2 (rename), Delete (delete), S (shuffle). Tap chip = skip/present.</footer>
 
   <script>
-// ===== Analytics (Google Sheets) =====
-const ANALYTICS_URL   = 'https://script.google.com/macros/s/AKfycbxHUvZBtHxlR6Qssr1N0hAtJhENCY1jqx4XI-lcwwy2b9Ej3rx9VJNbNqICvam6VoSZ/exec';
-const ANALYTICS_TOKEN = '';           // optional; keep '' if you didn't set one in Apps Script
-const APP_VERSION     = '1.0.0';
-
-function getClientId(){
-  let id = localStorage.getItem('standup_client_id');
-  if (!id) { id = 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('standup_client_id', id); }
-  return id;
-}
-
-function track(event, payload = {}) {
-  const cid   = getClientId();
-  const date  = todayISO();
-  const team  = (typeof currentTeam === 'function' && currentTeam()) ? (currentTeam().name || '') : '';
-  const body  = {
-    token: ANALYTICS_TOKEN,
-    event,
-    date,
-    client_id: cid,
-    session_id: `${date}:${cid}`,   // we are NOT deduping
-    team,
-    payload,
-    app_version: APP_VERSION
-  };
-  enqueueEvent(body);
-  flushEventQueue();
-}
-
-function enqueueEvent(ev){
-  const q = JSON.parse(localStorage.getItem('standup_evt_q') || '[]');
-  q.push(ev);
-  localStorage.setItem('standup_evt_q', JSON.stringify(q));
-}
-
-async function flushEventQueue(){
-  let q = JSON.parse(localStorage.getItem('standup_evt_q') || '[]');
-  if (!q.length) return;
-  try {
-    while (q.length) {
-      const ev = q[0];
-      const ok = await sendEvent(ev);
-      if (!ok) break;
-      q.shift();
-    }
-  } finally {
-    localStorage.setItem('standup_evt_q', JSON.stringify(q));
+  // ===== Helpers =====
+  const q  = (s)=>document.querySelector(s);
+  const qa = (s)=>Array.from(document.querySelectorAll(s));
+  const todayISO = ()=> new Date().toISOString().slice(0,10);
+  function toast(msg, variant='info'){
+    const wrap = document.getElementById('toastWrap') || (()=>{const d=document.createElement('div');d.id='toastWrap';document.body.appendChild(d);return d;})();
+    const bg = variant==='error' ? 'bg-rose-600' : variant==='ok' ? 'bg-emerald-600' : 'bg-slate-900';
+    const el = document.createElement('div'); el.className = `toast ${bg} text-white text-sm px-3 py-2 rounded-lg shadow`; el.textContent = msg; wrap.appendChild(el);
+    setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(), 300); }, 1400);
   }
-}
+  function mulberry32(seed){return function(){let t=seed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}}
+  function strHash(s){let h=2166136261>>>0; for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);} return h>>>0}
+  function uuid(){try{if(window.crypto&&crypto.randomUUID) return crypto.randomUUID();}catch(e){} return 'id-'+Math.random().toString(36).slice(2)+'-'+Date.now().toString(36)}
+  function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]))}
 
-function sendEvent(ev){
-  if (navigator.sendBeacon) {
-    const blob = new Blob([JSON.stringify(ev)], { type: 'text/plain' });
-    const ok = navigator.sendBeacon(ANALYTICS_URL, blob);
-    return Promise.resolve(ok);
+  // ===== State =====
+  const LS='standupAppV5_ultra';
+  let state={teams:{}, currentTeamId:null};
+  function emptyTeam(id,name){return{ id,name, members:[], order:{date:'',list:[],roles:{},firstHistory:{}}, options:{deterministic:false, avoidRepeatFirst:true, takeNotes:false}, notesDaily:{} }}
+  function save(){ try{ localStorage.setItem(LS, JSON.stringify(state)); }catch(_){} }
+  function load(){
+    try{ const raw=localStorage.getItem(LS); if(raw) state=JSON.parse(raw)||state; }catch(_){ }
+    sanitizeState();
   }
-  return fetch(ANALYTICS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(ev) })
-    .then(() => true)
-    .catch(() => false);
-}
-window.addEventListener('online', flushEventQueue);
-
-
-    // ===== Utilities =====
-    const $ = (sel) => document.querySelector(sel);
-    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-    const todayISO = () => new Date().toISOString().slice(0,10);
-
-    function toast(msg, variant='info'){
-      const wrap = document.getElementById('toastWrap');
-      const bg = variant==='error' ? 'bg-rose-600' : variant==='ok' ? 'bg-emerald-600' : 'bg-slate-900';
-      const el = document.createElement('div');
-      el.className = `toast ${bg} text-white text-sm px-3 py-2 rounded-lg shadow`;
-      el.textContent = msg;
-      wrap.appendChild(el);
-      setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(), 300); }, 1500);
-    }
-
-    // Simple seeded RNG (mulberry32)
-    function mulberry32(seed){
-      return function(){
-        let t = seed += 0x6D2B79F5;
-        t = Math.imul(t ^ t >>> 15, t | 1);
-        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-      }
-    }
-    function strHash(s){
-      let h = 2166136261 >>> 0;
-      for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-      return h >>> 0;
-    }
-
-    // UUID helper with fallback (some preview sandboxes block crypto.randomUUID)
-    function uuid(){
-      try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch(e){}
-      return 'id-' + Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
-    }
-
-    // ===== State =====
-    const LS_KEY = 'standupAppV1';
-    let state = {
-      teams: {}, // id -> {id,name,members:[{id,name,present}], order:{date,list,roles,firstHistory:{}}, timer:{per:60,index:0,remaining:null,running:false}}
-      currentTeamId: null,
-    };
-
-    function load(){
-      try{ const raw = localStorage.getItem(LS_KEY); if(raw){ state = JSON.parse(raw); } }catch(e){ console.warn('load fail', e); }
-      if(!state || !state.teams || Object.keys(state.teams).length===0){
-        const id = uuid();
-        state = { teams: { [id]: emptyTeam(id, 'My Team') }, currentTeamId: id };
-        save();
-      }
-
-
-    }
-    function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
-
-  function emptyTeam(id, name){
-  return {
-    id, name,
-    members: [],
-    order: { date: '', list: [], roles: {}, firstHistory: {} },
-    timer: { per:60, index:0, remaining:null, running:false, lastTick:null },
-    notes: {} // <-- date -> { memberId: "note text" }
-  };
-}
-
-
-    function currentTeam(){ return state.teams[state.currentTeamId]; }
-
-    // ===== Team Management (exposed) =====
-    function newTeam(){
-      const name = prompt('New team name');
-      if(!name) return;
-      const id = uuid();
-      state.teams[id] = emptyTeam(id, name.trim());
-      state.currentTeamId = id;
-      save();
-      renderAll();
-      toast('Team created', 'ok');
-      track('team_created', { name: name.trim() });
-
-    }
-    function renameTeam(){
-      const t = currentTeam(); if(!t) return;
-      const name = prompt('Rename team', t.name);
-      if(!name) return;
-      t.name = name.trim(); save(); renderAll(); toast('Team renamed', 'ok');
-    }
-    function deleteTeam(){
-      const t = currentTeam(); if(!t) return;
-      if(!confirm(`Delete team "${t.name}"?`)) return;
-      delete state.teams[t.id];
-      const remaining = Object.keys(state.teams);
-      state.currentTeamId = remaining[0] || null;
-      if(!state.currentTeamId){
-        const id = uuid();
-        state.teams[id] = emptyTeam(id,'My Team');
-        state.currentTeamId = id;
-      }
-      save(); renderAll(); toast('Team deleted','ok');
-    }
-    window.newTeam = newTeam; window.renameTeam = renameTeam; window.deleteTeam = deleteTeam;
-
- function switchTeam(id){
-  state.currentTeamId = id;
-  save();
-  renderAll();
-  track('session_start', { teamId: id, teamName: (state.teams[id]?.name) || '' });
-}
-
-
-    // ===== Member Ops =====
-    function addMember(name){
-      name = name.trim(); if(!name) return;
-      const t = currentTeam();
-      const exists = t.members.some(m=>m.name.toLowerCase()===name.toLowerCase());
-      if(exists){ toast('Already exists'); return; }
-      t.members.push({ id: uuid(), name, present: true });
-      save(); renderMembers(); renderAttendance();
-    }
-    function addMembersBulk(text){
-      const parts = text.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
-      parts.forEach(n=>addMember(n));
-    }
-    function removeMember(id){
-      const t = currentTeam();
-      t.members = t.members.filter(m=>m.id!==id);
-      // also clean from order
-      if(t.order && Array.isArray(t.order.list)){
-        t.order.list = t.order.list.filter(mid=>mid!==id);
-      }
-      save(); renderAll(); toast('Deleted','ok');
-    }
-    function togglePresent(id, present){
-      const t = currentTeam();
-      const m = t.members.find(x=>x.id===id); if(!m) return;
-      m.present = present;
-      save(); renderAttendance();
-    }
-
-    // ===== Order & Roles =====
-    function getPresentMembers(){
-      const t = currentTeam();
-      return t.members.filter(m=>m.present);
-    }
-    function shuffleDeterministic(arr, seed){
-      const rnd = mulberry32(seed);
-      const a = arr.slice();
-      for(let i=a.length-1;i>0;i--){ const j = Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
-      return a;
-    }
-    function shuffleRandom(arr){
-      const a = arr.slice();
-      for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
-      return a;
-    }
-    function assignRoles(orderIds){
-      const t = currentTeam();
-      const wantFac = $('#roleFac').checked;
-      const wantNote = $('#roleNote').checked;
-      const wantDemo = $('#roleDemo').checked;
-      const roles = {};
-      const pick = (roleName) => {
-        if(!roleName) return;
-        if(orderIds.length===0) return;
-        const idx = Math.min(orderIds.length-1, 0); // by default assign the first
-        const id = orderIds[idx];
-        roles[roleName] = id;
-      };
-      // Assign in order to first distinct people if possible
-      let pool = orderIds.slice();
-      function take(){ return pool.shift(); }
-      if(wantFac && pool.length) roles['facilitator'] = take();
-      if(wantNote && pool.length) roles['noteTaker'] = take();
-      if(wantDemo && pool.length) roles['demo'] = take();
-      t.order.roles = roles; save();
-      return roles;
-    }
-
-    function randomizeOrder(){
-      const t = currentTeam();
-      const present = getPresentMembers().map(m=>m.id);
-      if(present.length===0){ toast('No present members','error'); return; }
-      const deterministic = $('#deterministic').checked;
-      const avoidRepeat = $('#avoidRepeatFirst').checked;
-      const date = todayISO();
-
-      let orderIds;
-      if(deterministic){
-        const seed = strHash(date + '|' + t.id);
-        orderIds = shuffleDeterministic(present, seed);
-      } else {
-        orderIds = shuffleRandom(present);
-      }
-
-      if(avoidRepeat){
-        const yesterday = new Date(date); yesterday.setDate(yesterday.getDate()-1);
-        const yISO = yesterday.toISOString().slice(0,10);
-        const yFirst = t.order.firstHistory ? t.order.firstHistory[yISO] : null;
-        if(yFirst && orderIds[0]===yFirst && orderIds.length>1){
-          // swap first two
-          [orderIds[0], orderIds[1]] = [orderIds[1], orderIds[0]];
-        }
-      }
-
-      // Save history of first speaker
-      if(!t.order.firstHistory) t.order.firstHistory = {};
-      t.order.firstHistory[date] = orderIds[0];
-
-      t.order.date = date;
-      t.order.list = orderIds;
-      assignRoles(orderIds.slice());
-      // Reset timer to start
-      t.timer.index = 0; t.timer.running=false; t.timer.remaining = null; t.timer.lastTick=null;
-      save();
-      renderOrder(); renderTimer();
-      t.timer.meetingStartedAt = performance.now();
-track('meeting_started', {
-  count: orderIds.length,
-  roles: t.order.roles || {},
-  deterministic: !!document.getElementById('deterministic').checked
-});
-
-
-    }
-
-    function resetOrder(){
-      const t = currentTeam(); t.order.list = []; t.order.date=''; t.order.roles={}; save(); renderOrder(); toast('Order reset');
-    }
-
-    // ===== Timer =====
-    let rafId = null;
-    function formatSecs(s){ s = Math.max(0, Math.ceil(s)); const m = Math.floor(s/60).toString().padStart(2,'0'); const sec = (s%60).toString().padStart(2,'0'); return `${m}:${sec}`; }
-
-    function ensureTimerDefaults(){
-      const t = currentTeam();
-      if(!t.timer) t.timer = { per:60, index:0, remaining:null, running:false, lastTick:null };
-    }
-
-    function startPauseTimer(){
-      const t = currentTeam(); ensureTimerDefaults();
-      if(!t.order.list || t.order.list.length===0){ toast('Set today\'s order first','error'); return; }
-      if(t.timer.running){ t.timer.running=false; save(); renderTimer(); return; }
-      // start
-      t.timer.running = true;
-      if(t.timer.remaining==null){ t.timer.remaining = t.timer.per; }
-      t.timer.lastTick = performance.now();
-      save();
-      tick();
-      renderTimer();
-    }
-
-    function tick(){
-      const t = currentTeam(); if(!t.timer.running){ cancelAnimationFrame(rafId); return; }
-      const now = performance.now();
-      const dt = (now - (t.timer.lastTick||now))/1000;
-      t.timer.lastTick = now;
-      t.timer.remaining = Math.max(0, (t.timer.remaining||0) - dt);
-      renderTimerDisplay();
-      if(t.timer.remaining<=0){
-        // auto next
-        nextSpeaker();
-      }
-      rafId = requestAnimationFrame(tick);
-    }
-
-    function nextSpeaker(){
-      const t = currentTeam(); ensureTimerDefaults();
-      if(!t.order.list || t.order.list.length===0){ toast('No order set','error'); return; }
-      if(t.timer.index < t.order.list.length-1){
-        t.timer.index++;
-        t.timer.remaining = t.timer.per;
-        t.timer.running = false; // require manual start
-        save(); renderTimer();
-      } else {
-  t.timer.running=false;
-
-  save(); renderTimer(); toast('All done','ok');
-        const dur = Math.round(((performance.now() - (t.timer.meetingStartedAt || performance.now())) / 1000));
-track('meeting_completed', {
-  count: t.order.list.length,
-  durationSec: isFinite(dur) ? dur : null
-});
-
-}
-    }
-
-    function resetTimer(){
-      const t = currentTeam(); ensureTimerDefaults();
-      t.timer.index = 0; t.timer.remaining = t.timer.per; t.timer.running=false; save(); renderTimer();
-    }
-
-    function updatePerSeconds(val){
-      const t = currentTeam(); ensureTimerDefaults();
-      const n = Math.max(5, parseInt(val||60,10));
-      t.timer.per = n; if(t.timer.remaining==null) t.timer.remaining = n; save(); renderTimerDisplay();
-    }
-
-    // ===== Notes helpers =====
-function ensureNotes(date){
-  const t = currentTeam();
-  if (!t.notes) t.notes = {};
-  if (!t.notes[date]) t.notes[date] = {};
-  return t.notes[date];
-}
-function getCurrentSpeakerId(){
-  const t = currentTeam();
-  return (t.order?.list || [])[t.timer.index || 0];
-}
-function renderNotes(){
-  const t = currentTeam();
-  const date = t.order?.date || todayISO();
-  ensureNotes(date);
-  const sp = getCurrentSpeakerId();
-  const name = sp ? (t.members.find(x=>x.id===sp)?.name || '—') : '—';
-  const note = (t.notes[date] && t.notes[date][sp]) || '';
-  const meta = document.getElementById('notesMeta');
-  const ta = document.getElementById('notesTextarea');
-  if (meta) meta.textContent = date + (name !== '—' ? ` • ${name}` : '');
-  if (ta) ta.value = note;
-}
-function setCurrentNote(val){
-  const t = currentTeam();
-  const date = t.order?.date || todayISO();
-  ensureNotes(date);
-  const sp = getCurrentSpeakerId();
-  if (!sp) return;
-  t.notes[date][sp] = val;
-  save();
-  // refresh badges in order list
-  renderOrder();
-}
-function copySpeakerNote(memberId){
-  const t = currentTeam();
-  const date = t.order?.date || todayISO();
-  const name = t.members.find(m=>m.id===memberId)?.name || '—';
-  const note = (t.notes?.[date]?.[memberId]) || '';
-  const text = `${name} (${date})\n${note || ''}`;
-  navigator.clipboard.writeText(text)
-    .then(()=> toast('Copied','ok'))
-    .catch(()=> toast('Copy failed','error'));
-}
-function copyAllNotesToday(){
-  const t = currentTeam();
-  const date = t.order?.date || todayISO();
-  const day = t.notes?.[date] || {};
-  const lines = (t.order?.list || []).map(id => {
-    const nm = t.members.find(m=>m.id===id)?.name || id;
-    const nv = (day[id] || '').trim();
-    return `${nm}: ${nv}`;
-  }).join('\n');
-  navigator.clipboard.writeText(lines)
-    .then(()=> toast('Copied','ok'))
-    .catch(()=> toast('Copy failed','error'));
-}
-// tiny debounce helper
-function debounce(fn, wait){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a), wait); }; }
-
-
-    // ===== Rendering =====
-    function renderTeams(){
-      const sel = $('#teamSelect'); sel.innerHTML = '';
+  function sanitizeState(){
+    if(!state || typeof state!=='object') state={teams:{}, currentTeamId:null};
+    if(!state.teams || typeof state.teams!=='object') state.teams={};
+    let id = state.currentTeamId;
+    if(!id || !state.teams[id]){
       const ids = Object.keys(state.teams);
-      if(!state.currentTeamId || !state.teams[state.currentTeamId]){
-        state.currentTeamId = ids[0] || null; save();
+      if(ids.length){ state.currentTeamId = ids[0]; }
+      else {
+        const nid = uuid(); state.teams[nid]=emptyTeam(nid,'My Team'); state.currentTeamId=nid;
       }
-      ids.forEach(id=>{
-        const t = state.teams[id];
-        const opt = document.createElement('option');
-        opt.value = t.id; opt.textContent = t.name; opt.selected = (t.id===state.currentTeamId);
-        sel.appendChild(opt);
-      });
+      save();
     }
-
-    function renderMembers(){
-      const t = currentTeam();
-      const chips = $('#memberChips'); chips.innerHTML='';
-      t.members.forEach(m=>{
-        const item = document.createElement('div');
-        item.className = 'chip inline-flex items-center bg-slate-100 border border-slate-200 text-slate-800 px-2 py-1 rounded-lg';
-        item.innerHTML = `<span class="text-sm">${escapeHtml(m.name)}</span>`;
-        const x = document.createElement('button');
-        x.className = 'chip-x'; x.setAttribute('aria-label', `Remove ${m.name}`);
-        x.innerHTML = '✕';
-        x.addEventListener('click', ()=> removeMember(m.id));
-        item.appendChild(x);
-        chips.appendChild(item);
-      });
-    }
-
-    function renderAttendance(){
-      const t = currentTeam(); const ul = $('#attendanceList'); ul.innerHTML='';
-      t.members.forEach(m=>{
-        const li = document.createElement('li');
-        li.className='bg-white flex items-center justify-between px-3 py-2';
-        li.innerHTML = `
-          <div class="flex items-center gap-3">
-            <input type="checkbox" ${m.present?'checked':''} class="rounded border-slate-300 attendanceCheck">
-            <span>${escapeHtml(m.name)}</span>
-          </div>
-        `;
-        const cb = li.querySelector('.attendanceCheck');
-        cb.addEventListener('change', (e)=> togglePresent(m.id, e.target.checked));
-        ul.appendChild(li);
-      });
-    }
-
-    function renderOrder(){
-        const t = currentTeam();
-  const ol = $('#orderList'); ol.innerHTML='';
-  const list = t.order?.list || [];
-  const roles = t.order?.roles || {};
-  const date = t.order?.date || todayISO();
-
-  list.forEach((id)=>{
-    const m = t.members.find(x=>x.id===id); if(!m) return;
-    const roleBadges = [];
-    if(roles.facilitator===id) roleBadges.push('<span class="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">Facilitator</span>');
-    if(roles.noteTaker===id)   roleBadges.push('<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">Note-taker</span>');
-    if(roles.demo===id)        roleBadges.push('<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">Demo</span>');
-
-    const hasNote = (t.notes && t.notes[date] && t.notes[date][id] && t.notes[date][id].trim().length>0);
-    const noteBadge = hasNote ? '<span class="ml-1.5 text-[10px] px-1 rounded bg-slate-200 text-slate-700">📝</span>' : '';
-
-    const li = document.createElement('li');
-    li.innerHTML = `
-      <div class="flex items-center justify-between gap-2">
-        <div><span>${escapeHtml(m.name)}</span>${roleBadges.join('')}${noteBadge}</div>
-        <button class="text-xs px-2 py-1 border border-slate-300 rounded hover:bg-slate-100"
-          title="Copy ${escapeHtml(m.name)}'s note"
-          onclick="copySpeakerNote('${id}')">Copy note</button>
-      </div>
-    `;
-    ol.appendChild(li);
-  });
-  $('#todayLabel').textContent = t.order?.date ? `For ${t.order.date}` : '—';
-  renderTimer(); // keep timer in sync
-    }
-
-    function renderTimer(){
-      const t = currentTeam(); ensureTimerDefaults();
-      const list = t.order?.list || [];
-      const idx = Math.min(t.timer.index || 0, Math.max(0, list.length-1));
-      const curId = list[idx];
-      const curName = curId ? (t.members.find(x=>x.id===curId)?.name || '—') : '—';
-      $('#currentSpeaker').textContent = curName;
-      $('#secondsInput').value = t.timer.per || 60;
-      if(t.timer.remaining==null) t.timer.remaining = t.timer.per || 60;
-      renderTimerDisplay();
-      $('#startPauseBtn').textContent = t.timer.running ? 'Pause' : 'Start';
-      renderNotes();
-
-    }
-
-    function renderTimerDisplay(){
-      const t = currentTeam(); const s = t.timer?.remaining ?? t.timer?.per ?? 60;
-      $('#timerDisplay').textContent = formatSecs(s);
-    }
-
-    // ===== Helpers =====
-    function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[c])); }
-
-    // ===== Copy =====
-    async function copyOrder(){
-      const t = currentTeam();
-      const names = (t.order?.list||[]).map(id=> t.members.find(m=>m.id===id)?.name).filter(Boolean);
-      const text = names.join('\n');
-      try{ await navigator.clipboard.writeText(text); toast('Copied','ok'); } catch(e){ toast('Copy failed','error'); }
-    }
-
-    // ===== Events =====
-    function bindEvents(){
-      $('#teamSelect').addEventListener('change', (e)=> switchTeam(e.target.value));
-      $('#addMemberBtn').addEventListener('click', ()=> { const val = $('#memberInput').value; addMember(val); $('#memberInput').value=''; $('#memberInput').focus(); });
-      $('#memberInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); $('#addMemberBtn').click(); }});
-      $('#bulkAddBtn').addEventListener('click', ()=>{ addMembersBulk($('#bulkInput').value); toast('Added','ok'); });
-      $('#bulkClearBtn').addEventListener('click', ()=>{ $('#bulkInput').value=''; });
-
-      $('#randomizeBtn').addEventListener('click', randomizeOrder);
-      $('#copyOrderBtn').addEventListener('click', copyOrder);
-      $('#resetOrderBtn').addEventListener('click', resetOrder);
-
-      $('#startPauseBtn').addEventListener('click', startPauseTimer);
-      $('#nextBtn').addEventListener('click', nextSpeaker);
-      $('#resetBtn').addEventListener('click', resetTimer);
-      $('#secondsInput').addEventListener('change', (e)=> updatePerSeconds(e.target.value));
-
-      // Persist deterministic + avoidRepeat toggles per team
-      ['deterministic','avoidRepeatFirst','roleFac','roleNote','roleDemo'].forEach(id=>{
-        document.getElementById(id).addEventListener('change', ()=>{
-          const t = currentTeam(); if(!t.options) t.options={}; t.options[id]=document.getElementById(id).checked; save();
-        });
-      });
-
-      // Notes panel
-const debounced = debounce((val)=> setCurrentNote(val), 300);
-const ta = document.getElementById('notesTextarea');
-if (ta) ta.addEventListener('input', (e)=> debounced(e.target.value));
-const copyBtn = document.getElementById('copyNotesBtn');
-if (copyBtn) copyBtn.addEventListener('click', ()=>{
-  const t = currentTeam();
-  const date = t.order?.date || todayISO();
-  const sp = getCurrentSpeakerId();
-  const name = sp ? (t.members.find(x=>x.id===sp)?.name || '—') : '—';
-  const text = `${name} (${date})\n${document.getElementById('notesTextarea').value}`;
-  navigator.clipboard.writeText(text).then(()=> toast('Copied','ok')).catch(()=> toast('Copy failed','error'));
-});
-const clearBtn = document.getElementById('clearNotesBtn');
-if (clearBtn) clearBtn.addEventListener('click', ()=>{
-  document.getElementById('notesTextarea').value = '';
-  setCurrentNote('');
-  toast('Deleted','ok');
-});
-const copyAllBtn = document.getElementById('copyMeetingNotesBtn');
-if (copyAllBtn) copyAllBtn.addEventListener('click', copyAllNotesToday);
-// Mic controls
-      // ===== Mic state (declare early to avoid TDZ) =====
-var mic = window.mic || {
-  active: false,
-  rec: null,
-  lang: localStorage.getItem('standup_mic_lang') || (navigator.language || 'en-US')
-};
-window.mic = mic; // keep a single global
-
-const micBtn = document.getElementById('micToggleBtn');
-if (micBtn) micBtn.addEventListener('click', () => mic.active ? stopMic() : startMic());
-
-const micLangSel = document.getElementById('micLang');
-if (micLangSel) {
-  // set current language
-  micLangSel.value = mic.lang;
-  micLangSel.addEventListener('change', (e) => {
-    mic.lang = e.target.value;
-    localStorage.setItem('standup_mic_lang', mic.lang);
-    if (mic.active) { stopMic(); startMic(); } // restart with new language
-  });
-}
-
-    }
-
-    function restoreOptions(){
-      const t = currentTeam(); if(!t.options) t.options={};
-      ['deterministic','avoidRepeatFirst','roleFac','roleNote','roleDemo'].forEach(id=>{
-        document.getElementById(id).checked = !!t.options[id];
-      });
-    }
-
-    function renderAll(){
-      renderTeams(); restoreOptions(); renderMembers(); renderAttendance(); renderOrder();
-      document.getElementById('todayLabel').textContent = `For ${todayISO()}`;
-    }
-
-    // ===== Init =====
-    load();
-    bindEvents();
-    renderAll();
-    // ===== Init =====
-load();
-bindEvents();
-renderAll();
-
-// Log every page load as a session (no dedupe)
-track('session_start', {
-  teamId: state.currentTeamId,
-  teamName: (currentTeam()?.name) || ''
-});
-
-
-
-function isSpeechApiSupported(){
-  return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
-}
-
-function createRecognizer(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new SR();
-  rec.lang = mic.lang;
-  rec.continuous = true;        // keep listening
-  rec.interimResults = true;    // we’ll only commit final results
-  rec.maxAlternatives = 1;
-
-  rec.onresult = (e) => {
-    let finalText = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const res = e.results[i];
-      if (res.isFinal) finalText += res[0].transcript + ' ';
-    }
-    if (finalText.trim().length) appendToNotes(finalText);
-  };
-
-  rec.onerror = (evt) => {
-    toast(`Mic error: ${evt.error}`, 'error');
-  };
-
-  rec.onend = () => {
-    // some browsers stop after a while—auto-restart if still active
-    if (mic.active) {
-      try { rec.start(); } catch (_) {}
-    }
-  };
-
-  return rec;
-}
-
-function appendToNotes(text){
-  const ta = document.getElementById('notesTextarea');
-  if (!ta) return;
-
-  // Optional: prefix with current speaker if textarea is empty
-  const t = currentTeam();
-  const sp = getCurrentSpeakerId?.();
-  const name = sp ? (t.members.find(x => x.id === sp)?.name || '') : '';
-
-  if (!ta.value.trim() && name) {
-    ta.value = `${name}: ${text.trim()} `;
-  } else {
-    ta.value = (ta.value + (ta.value.endsWith(' ') ? '' : ' ') + text.trim() + ' ');
   }
-  // persist via your existing notes flow
-  if (typeof setCurrentNote === 'function') setCurrentNote(ta.value);
-}
+  function currentTeam(){ sanitizeState(); return state.teams[state.currentTeamId]; }
 
-function startMic(){
-  if (!isSpeechApiSupported()) {
-    toast('Speech to text not supported in this browser', 'error');
-    return;
+  // ===== Parsing (fixed regex) =====
+  function parseNames(raw){
+    // Split on commas or newlines, trim, drop empties
+    return String(raw||'').split(/[\,\n]+/).map(s=>s.trim()).filter(Boolean);
   }
-  if (mic.rec) { try { mic.rec.stop(); } catch (_) {} }
 
-  mic.active = true;
-  mic.rec = createRecognizer();
-  try {
-    mic.rec.start();
-    toast('Mic on', 'ok');
-    const btn = document.getElementById('micToggleBtn');
-    if (btn) btn.textContent = '⏸︎ Stop Mic';
-  } catch (e) {
-    toast('Could not start mic', 'error');
+  // ===== Team Management (exposed) =====
+  function newTeam(){ const name=prompt('New team name'); if(!name) return; const id=uuid(); state.teams[id]=emptyTeam(id,name.trim()); state.currentTeamId=id; save(); renderAll(); toast('Team created','ok'); }
+  function renameTeam(){ const t=currentTeam(); if(!t) return; const name=prompt('Rename team', t.name); if(!name) return; t.name=name.trim(); save(); renderAll(); toast('Team renamed','ok'); }
+  function deleteTeam(){ const t=currentTeam(); if(!t) return; if(!confirm(`Delete team \"${t.name}\"?`)) return; delete state.teams[t.id]; const left=Object.keys(state.teams); state.currentTeamId=left[0]||null; if(!state.currentTeamId){ const id=uuid(); state.teams[id]=emptyTeam(id,'My Team'); state.currentTeamId=id; } save(); renderAll(); toast('Team deleted','ok'); }
+  window.newTeam=newTeam; window.renameTeam=renameTeam; window.deleteTeam=deleteTeam;
+  function switchTeam(id){ if(!state.teams[id]){ const first=Object.keys(state.teams)[0]||null; state.currentTeamId=first; } else { state.currentTeamId=id; } save(); renderAll(); }
+
+  // ===== Members =====
+  function addMembersFromInput(){
+    const raw = q('#memberInput').value;
+    if (!raw || !raw.trim()) return;
+    const team = currentTeam();
+    const before = (team && team.members && team.members.length) || 0;
+    const names = parseNames(raw);
+    names.forEach(addMember);
+    const after = (currentTeam()?.members?.length)||0;
+    if (after > before) { updateOrderVisibility(); }
+    q('#memberInput').value = '';
+    q('#memberInput').focus();
   }
-}
+  function addMember(name){
+    name=(name||'').trim(); if(!name) return;
+    const t=currentTeam(); if(!t) return;
+    if(!Array.isArray(t.members)) t.members=[];
+    if(t.members.some(m=>m.name.toLowerCase()===name.toLowerCase())){ toast('Already there'); return; }
+    t.members.push({id:uuid(), name, present:true}); save(); autoOrder(); renderMembers(); renderQueue();
+  }
+  function removeMember(id){ const t=currentTeam(); if(!t) return; t.members=(t.members||[]).filter(m=>m.id!==id); if(t.order?.list) t.order.list=t.order.list.filter(x=>x!==id); save(); autoOrder(); renderAll(); toast('Removed','ok'); }
+  function togglePresent(id){ const t=currentTeam(); if(!t) return; const m=(t.members||[]).find(x=>x.id===id); if(!m) return; m.present=!m.present; save(); autoOrder(); renderMembers(); renderQueue(); }
 
-function stopMic(){
-  mic.active = false;
-  if (mic.rec) { try { mic.rec.stop(); } catch (_) {} }
-  const btn = document.getElementById('micToggleBtn');
-  if (btn) btn.textContent = '🎙️ Start Mic';
-}
+  // NOTE: Important: do NOT auto-correct invalid team here; tests expect [].
+  function getPresentIds(){
+    const id = state.currentTeamId;
+    const team = (id && state.teams && state.teams[id]) ? state.teams[id] : null;
+    if(!team || !Array.isArray(team.members)) return [];
+    return team.members.filter(m=>m.present).map(m=>m.id);
+  }
 
+  // ===== Order (leader on top, avoid repeating yesterday's leader) =====
+  function randomizeOrder(opts={}){
+    const t=currentTeam(); if(!t) return [];
+    const ids=getPresentIds();
+    if(ids.length===0){ t.order={date:'',list:[],roles:{},firstHistory:t.order?.firstHistory||{}}; save(); return []; }
+    const date=todayISO();
+    const deterministic = !opts.forceRandom && !!(t.options?.deterministic);
+    // avoid same leader as yesterday
+    let candidates = ids.slice();
+    if(t.options?.avoidRepeatFirst){
+      const y=new Date(date); y.setDate(y.getDate()-1);
+      const yISO=y.toISOString().slice(0,10);
+      const yFirst=t.order.firstHistory?.[yISO];
+      if(yFirst){ const filtered=candidates.filter(id=>id!==yFirst); if(filtered.length) candidates=filtered; }
+    }
+    // pick leader
+    let leader;
+    if(deterministic){ leader = shuffleDeterministic(candidates, strHash('leader|'+date+'|'+t.id))[0]; }
+    else { leader = candidates[Math.floor(Math.random()*candidates.length)]; }
+    // order the rest
+    const rest = ids.filter(id=>id!==leader);
+    const restOrder = deterministic ? shuffleDeterministic(rest, strHash(date+'|'+t.id)) : shuffleRandom(rest);
+    let arr = [leader, ...restOrder];
+    // Anti-stall
+    const prev = Array.isArray(t.order?.list)? t.order.list.slice(): [];
+    if(opts.forceRandom && prev.length>1 && JSON.stringify(prev)===JSON.stringify(arr)){
+      [arr[0], arr[1]] = [arr[1], arr[0]];
+    }
+    // persist
+    t.order.firstHistory ||= {}; t.order.firstHistory[date]=arr[0]; t.order.date=date; t.order.list=arr; save();
+    return arr;
+  }
+  function shuffleDeterministic(arr,seed){ const rnd=mulberry32(seed); const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a }
+  function shuffleRandom(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a }
+  function autoOrder(){ const t=currentTeam(); if(!t) return; const d=todayISO(); const present=getPresentIds(); if(t.order.date!==d || !t.order.list || t.order.list.length!==present.length || !present.every(id=>t.order.list.includes(id))){ randomizeOrder(); } }
 
-  </script>
+  // ===== Manual notes (per‑day, per‑team) =====
+  function ensureNotesDaily(date){ const t=currentTeam(); if(!t.notesDaily) t.notesDaily={}; if(!(date in t.notesDaily)) t.notesDaily[date]=''; return t.notesDaily; }
+  function renderNotesSection(){
+    const t=currentTeam(); if(!t) return;
+    const date=t.order?.date||todayISO(); ensureNotesDaily(date);
+    const toggle=q('#notesToggle'); const wrap=q('#notesWrap'); const area=q('#notesArea');
+    if(!toggle||!wrap||!area) return;
+    // show if user opted in or there is existing text
+    const want = !!(t.options && t.options.takeNotes);
+    toggle.checked = want || (t.notesDaily[date] && t.notesDaily[date].trim().length>0);
+    wrap.classList.toggle('hidden', !toggle.checked);
+    area.value = t.notesDaily[date] || '';
+  }
+  const saveNotesDebounced = (function(){ let to; return function(){ clearTimeout(to); to=setTimeout(()=>{ const t=currentTeam(); if(!t) return; const date=t.order?.date||todayISO(); ensureNotesDaily(date); const area=q('#notesArea'); t.notesDaily[date] = (area?.value||''); save(); }, 250); }; })();
+
+  function doShuffle(){
+    const arr = randomizeOrder({forceRandom:true});
+    if(!arr.length){ toast('No present members','error'); return; }
+    renderQueue();
+    renderNotesSection();
+    const t=currentTeam(); if(!t) return;
+    const leaderId=arr[0];
+    const leaderName=(t.members||[]).find(m=>m.id===leaderId)?.name||'Leader';
+    toast(`Leader: ${leaderName}`,'ok');
+  }
+
+  // ===== Visibility helpers =====
+  function shouldShowOrder(){ const t=currentTeam(); return !!(t && Array.isArray(t.members) && t.members.length>0); }
+  function updateOrderVisibility(){ const card=document.getElementById('orderCard'); if(!card) return; card.classList.toggle('hidden', !shouldShowOrder()); }
+
+  // ===== Render =====
+  function renderTeams(){ const sel=q('#teamSelect'); if(!sel) return; sel.innerHTML=''; const ids=Object.keys(state.teams||{}); if(!state.currentTeamId||!state.teams[state.currentTeamId]){ state.currentTeamId=ids[0]||state.currentTeamId; sanitizeState(); }
+    Object.keys(state.teams).forEach(id=>{ const t=state.teams[id]; const opt=document.createElement('option'); opt.value=t.id; opt.textContent=t.name; opt.selected=(t.id===state.currentTeamId); sel.appendChild(opt); }); }
+  function renderMembers(){ const wrap=q('#memberChips'); if(!wrap) return; wrap.innerHTML=''; const t=currentTeam(); if(!t) return; (t.members||[]).forEach(m=>{ const d=document.createElement('div'); d.className=`chip inline-flex items-center px-2 py-1 rounded-lg border ${m.present?'bg-slate-100 text-slate-800 border-slate-200':'bg-white text-slate-400 border-slate-200 line-through opacity-70'}`; d.setAttribute('data-id', m.id); d.innerHTML=`<span class="text-sm select-none">${escapeHtml(m.name)}</span>`; const x=document.createElement('button'); x.className='chip-x ml-1'; x.title=`Remove ${m.name}`; x.innerHTML='✕'; x.addEventListener('click', (ev)=>{ ev.stopPropagation(); removeMember(m.id); }); d.addEventListener('click', ()=> togglePresent(m.id)); d.appendChild(x); wrap.appendChild(d); }); }
+  function renderQueue(){
+    const t=currentTeam(); if(!t) return;
+    const listEl=q('#queueList'); if(!listEl) return; listEl.innerHTML='';
+    const list=t.order?.list||[];
+    const lbl=document.getElementById('todayLabel'); if(lbl) lbl.textContent = t.order?.date ? `For ${t.order.date}` : '—';
+    list.forEach((id,idx)=>{
+      const m=(t.members||[]).find(x=>x.id===id); if(!m) return;
+      const li=document.createElement('li');
+      const isLeader = idx===0;
+      li.innerHTML = `<a id="member-${id}" href="#member-${id}" class="block px-3 py-2 text-sm ${isLeader? 'bg-blue-50 font-semibold text-blue-900' : 'hover:bg-slate-50'}">
+          <span>${escapeHtml(m.name)}</span>
+          ${isLeader? '<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 align-middle">Leader</span>':''}
+        </a>`;
+      listEl.appendChild(li);
+    });
+  }
+  function renderAll(){
+    sanitizeState();
+    renderTeams();
+    renderMembers();
+    updateOrderVisibility();
+    if (shouldShowOrder()) { autoOrder(); renderQueue(); renderNotesSection(); }
+    const lbl=document.getElementById('todayLabel'); if(lbl) lbl.textContent=`For ${todayISO()}`;
+  }
+
+  // ===== Self-tests =====
+  function assertEq(name, got, expected){ const g = JSON.stringify(got); const e = JSON.stringify(expected); if(g!==e) throw new Error(`${name}: expected ${e} but got ${g}`); }
+  function runSelfTests(){
+    const backup = JSON.stringify(state);
+    try{
+      // parser tests
+      assertEq('parseNames commas', parseNames('Alice, Bob, Charlie'), ['Alice','Bob','Charlie']);
+      assertEq('parseNames newlines', parseNames('Alice\nBob\nCharlie'), ['Alice','Bob','Charlie']);
+      assertEq('parseNames mix', parseNames(' Alice,\n Bob , Charlie '), ['Alice','Bob','Charlie']);
+      assertEq('parseNames empties', parseNames(',\n, ,A,,\n'), ['A']);
+
+      // visibility with no team
+      const s0 = JSON.parse(backup);
+      s0.currentTeamId = null; s0.teams = {}; state = s0; save(); sanitizeState();
+      if(!currentTeam()) throw new Error('sanitizeState did not create default team');
+      assertEq('shouldShowOrder false on empty', shouldShowOrder(), false);
+
+      // corrupted currentTeamId → should not throw and present ids []
+      const s1 = JSON.parse(backup); state = s1; save(); sanitizeState();
+      const badId = 'missing-'+uuid(); state.currentTeamId = badId; save();
+      assertEq('present ids when id missing', getPresentIds(), []);
+
+      // avoid-yesterday-leader
+      const origId = state.currentTeamId; const tid1 = 'test1-'+uuid(); state.teams[tid1]=emptyTeam(tid1,'_t1'); state.currentTeamId=tid1;
+      ['A','B','C'].forEach(n=>state.teams[tid1].members.push({id:'m'+n,name:n,present:true}));
+      const y=new Date(); y.setDate(y.getDate()-1); const yISO=y.toISOString().slice(0,10);
+      state.teams[tid1].order={date:todayISO(), list:['mA','mB','mC'], roles:{}, firstHistory:{}};
+      state.teams[tid1].order.firstHistory[yISO]='mB';
+      const arr1 = randomizeOrder({forceRandom:true}); if(arr1[0]==='mB') throw new Error('Yesterday\'s leader reused');
+      state.currentTeamId = origId;
+
+      // anti-stall
+      const tid2 = 'test2-'+uuid(); state.teams[tid2]=emptyTeam(tid2,'_t2'); state.currentTeamId=tid2;
+      ['A','B','C'].forEach(n=>state.teams[tid2].members.push({id:'m'+n,name:n,present:true}));
+      state.teams[tid2].order={date:todayISO(), list:['mA','mB','mC'], roles:{}, firstHistory:{}}; save();
+      const oldRand=Math.random; Math.random=()=>0; const newArr=randomizeOrder({forceRandom:true}); Math.random=oldRand;
+      if(JSON.stringify(newArr)==='["mA","mB","mC"]') throw new Error('Anti-stall failed');
+
+      // single member
+      const tid3='test3-'+uuid(); state.teams[tid3]=emptyTeam(tid3,'_t3'); state.currentTeamId=tid3; state.teams[tid3].members.push({id:'mX',name:'X',present:true});
+      assertEq('single member leader', randomizeOrder({forceRandom:true}), ['mX']);
+
+      // notesDaily storage
+      const tid4='test4-'+uuid(); state.teams[tid4]=emptyTeam(tid4,'_t4'); state.currentTeamId=tid4; const d=todayISO();
+      state.teams[tid4].notesDaily[d] = 'hello';
+      assertEq('notesDaily saved', state.teams[tid4].notesDaily[d], 'hello');
+
+      console.log('Self-tests passed');
+    } catch(err){ console.error(err); toast('Self-test failed: '+err.message, 'error'); }
+    finally { try{ state = JSON.parse(backup); save(); }catch(_){} }
+  }
+
+  // ===== Events & shortcuts =====
+  function bindEvents(){
+    q('#teamSelect')?.addEventListener('change', (e)=> switchTeam(e.target.value));
+    q('#memberInput')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addMembersFromInput(); }});
+    document.getElementById('shuffleBtn')?.addEventListener('click', doShuffle);
+    document.getElementById('todayLabel')?.addEventListener('click', doShuffle);
+    // notes
+    q('#notesToggle')?.addEventListener('change', (e)=>{ const t=currentTeam(); if(!t) return; t.options = t.options||{}; t.options.takeNotes = !!e.target.checked; save(); renderNotesSection(); if(e.target.checked){ q('#notesArea')?.focus(); }});
+    q('#notesArea')?.addEventListener('input', saveNotesDebounced);
+
+    document.addEventListener('keydown', (e)=>{
+      if(e.key && e.key.toLowerCase()==='s'){ e.preventDefault(); doShuffle(); }
+      else if(e.ctrlKey && e.key.toLowerCase()==='n'){ e.preventDefault(); newTeam(); }
+      else if(e.key==='F2'){ e.preventDefault(); renameTeam(); }
+      else if(e.key==='Delete'){ e.preventDefault(); deleteTeam(); }
+    });
+  }
+
+  // ===== Init =====
+  load();          // load + sanitize
+  runSelfTests();  // now safe to mutate/restore
+  bindEvents();
+  renderAll();
+</script>
 </body>
 </html>
