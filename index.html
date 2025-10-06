@@ -3,319 +3,195 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stand‑up Randomizer — ultra‑minimal</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <title>Portfolio Concentration • Pie</title>
   <style>
-    html,body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    #toastWrap{position:fixed;top:12px;right:12px;z-index:50;display:flex;flex-direction:column;gap:.5rem}
-    .toast{animation:fadeSlide .25s ease-out}
-    @keyframes fadeSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-    .chip-x{display:inline-flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;border-radius:.375rem;border:1px solid rgb(203 213 225);background:white;transition:.15s}
-    .chip-x:hover{background:rgb(248 250 252)}
-    .chip-x:focus-visible{outline:2px solid rgba(59,130,246,.5);outline-offset:1px}
-    .chip{gap:.375rem}
-    .pill{border:1px solid rgb(226 232 240)}
+    :root{
+      --bg:#ffffff;--ink:#0b1220;--muted:#6b7280;--ring:#e5e7eb;--accent:#2563eb;--radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:900px;margin:24px auto;padding:12px;display:grid;gap:16px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    h1{font-size:18px;margin:0;letter-spacing:.2px;font-weight:700}
+    .card{background:#fff;border:1px solid var(--ring);border-radius:var(--radius);padding:14px;box-shadow:0 8px 24px rgba(2,6,23,.04)}
+    .row{display:grid;grid-template-columns:1fr;gap:16px}
+    @media(min-width:860px){.row{grid-template-columns:1.2fr 1fr}}
+    label{font-size:12px;color:var(--muted)}
+    input[type=text]{width:100%;background:#ffffff;border:1px solid #d1d5db;color:var(--ink);border-radius:12px;padding:10px 12px;outline:none;transition:border-color .15s ease}
+    input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px 8px;text-align:left}
+    th{font-weight:600;color:#111827;font-size:12px;letter-spacing:.3px}
+    tr{border-bottom:1px dashed #e5e7eb}
+    tr:last-child{border-bottom:none}
+    .mono{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .ghost-btn{background:#ffffff;border:1px solid #d1d5db;color:#111827;border-radius:12px;padding:8px 10px;cursor:pointer;font-weight:600;font-size:13px}
+    .ghost-btn:hover{border-color:var(--accent);color:#0b1220}
+    .icon-btn{background:transparent;border:none;color:#6b7280;cursor:pointer;padding:6px;border-radius:8px}
+    .icon-btn:hover{background:#f3f4f6;color:#111827}
+    .muted{color:var(--muted);font-size:12px}
+
+    /* Chart */
+    .chart-card{display:grid;gap:8px}
+    canvas{width:100%;height:360px;display:block}
+    .legend{display:grid;gap:6px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+    .legend-item{display:grid;grid-template-columns:14px 1fr;gap:8px;align-items:center}
+    .swatch{width:14px;height:14px;border-radius:4px;border:1px solid rgba(0,0,0,.08)}
+
+    /* Sticky total */
+    .totalbar{position:sticky;bottom:0;background:#fff;border:1px solid var(--ring);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 -6px 18px rgba(2,6,23,.05)}
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
-  <div id="toastWrap"></div>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Portfolio Concentration</h1>
+      <div class="muted">Enter amounts only (no %). The pie and total update automatically.</div>
+    </header>
 
-  <!-- Header (no action buttons) -->
-  <header class="max-w-4xl mx-auto px-4 pt-5 pb-2 flex items-center justify-between gap-2">
-    <h1 class="text-xl md:text-2xl font-semibold">Stand‑up</h1>
-    <select id="teamSelect" class="w-48 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Select team"></select>
-  </header>
-
-  <!-- Main -->
-  <main class="max-w-4xl mx-auto px-4 pb-10">
-    <!-- Add + chips -->
-    <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-      <input id="memberInput" type="text" placeholder="Add names — paste comma or newline list, then Enter" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Add member(s)" />
-      <div id="memberChips" class="mt-3 flex flex-wrap gap-2"></div>
-    </section>
-
-    <!-- Order only (hidden until members added) -->
-    <section id="orderCard" class="mt-4 hidden">
-      <div class="rounded-2xl border border-slate-200 bg-white p-4">
-        <div class="flex items-center justify-between gap-2">
-          <div class="text-sm text-slate-500 select-none cursor-pointer" id="todayLabel" title="Shuffle (S)">—</div>
-          <button id="shuffleBtn" class="px-2 py-1 text-xs rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300" title="Shuffle (S)">🎲 Shuffle</button>
+    <section class="card row">
+      <div class="left">
+        <div class="card" style="padding:0; border-radius:12px;">
+          <table id="tbl">
+            <thead>
+              <tr>
+                <th style="width:60%">Category</th>
+                <th style="width:30%">Amount</th>
+                <th style="width:10%"></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
         </div>
-        <ul id="queueList" class="mt-3 divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-white"></ul>
-
-        <!-- Manual notes toggle + area (hidden until checked) -->
-        <div class="mt-3 flex items-center gap-2">
-          <label class="inline-flex items-center gap-2 text-sm select-none">
-            <input id="notesToggle" type="checkbox" class="rounded border-slate-300">
-            Take manual notes
-          </label>
-        </div>
-        <div id="notesWrap" class="mt-2 hidden">
-          <textarea id="notesArea" rows="5" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Meeting notes for today…"></textarea>
+        <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+          <button id="add" class="ghost-btn">+ Add Category</button>
+          <div id="note" class="muted"></div>
         </div>
       </div>
-    </section>
-  </main>
 
-  <footer class="pb-10 text-center text-[10px] text-slate-500">Shortcuts: Ctrl+N (new team), F2 (rename), Delete (delete), S (shuffle). Tap chip = skip/present.</footer>
+      <div class="chart-card">
+        <canvas id="pie" width="600" height="600" aria-label="Portfolio pie chart"></canvas>
+        <div id="legend" class="legend"></div>
+      </div>
+    </section>
+
+    <div class="totalbar" id="totalbar">
+      <div class="muted">Total Portfolio</div>
+      <div class="mono" id="totalOut">0</div>
+    </div>
+  </div>
 
   <script>
-  // ===== Helpers =====
-  const q  = (s)=>document.querySelector(s);
-  const qa = (s)=>Array.from(document.querySelectorAll(s));
-  const todayISO = ()=> new Date().toISOString().slice(0,10);
-  function toast(msg, variant='info'){
-    const wrap = document.getElementById('toastWrap') || (()=>{const d=document.createElement('div');d.id='toastWrap';document.body.appendChild(d);return d;})();
-    const bg = variant==='error' ? 'bg-rose-600' : variant==='ok' ? 'bg-emerald-600' : 'bg-slate-900';
-    const el = document.createElement('div'); el.className = `toast ${bg} text-white text-sm px-3 py-2 rounded-lg shadow`; el.textContent = msg; wrap.appendChild(el);
-    setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(), 300); }, 1400);
-  }
-  function mulberry32(seed){return function(){let t=seed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}}
-  function strHash(s){let h=2166136261>>>0; for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);} return h>>>0}
-  function uuid(){try{if(window.crypto&&crypto.randomUUID) return crypto.randomUUID();}catch(e){} return 'id-'+Math.random().toString(36).slice(2)+'-'+Date.now().toString(36)}
-  function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]))}
+    // --- Utilities ---
+    const byId = (id) => document.getElementById(id);
+    const fmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+    const moneyFmt = (n) => (isFinite(n) ? fmt.format(n) : "—");
 
-  // ===== State =====
-  const LS='standupAppV5_ultra';
-  let state={teams:{}, currentTeamId:null};
-  function emptyTeam(id,name){return{ id,name, members:[], order:{date:'',list:[],roles:{},firstHistory:{}}, options:{deterministic:false, avoidRepeatFirst:true, takeNotes:false}, notesDaily:{} }}
-  function save(){ try{ localStorage.setItem(LS, JSON.stringify(state)); }catch(_){} }
-  function load(){
-    try{ const raw=localStorage.getItem(LS); if(raw) state=JSON.parse(raw)||state; }catch(_){ }
-    sanitizeState();
-  }
-  function sanitizeState(){
-    if(!state || typeof state!=='object') state={teams:{}, currentTeamId:null};
-    if(!state.teams || typeof state.teams!=='object') state.teams={};
-    let id = state.currentTeamId;
-    if(!id || !state.teams[id]){
-      const ids = Object.keys(state.teams);
-      if(ids.length){ state.currentTeamId = ids[0]; }
-      else {
-        const nid = uuid(); state.teams[nid]=emptyTeam(nid,'My Team'); state.currentTeamId=nid;
+    function parseAmount(str){
+      if(typeof str !== 'string') return 0;
+      const clean = str.replace(/[,\\s]/g,'');
+      const num = Number(clean);
+      return isFinite(num) && num > 0 ? num : 0;
+    }
+    function hsl(i,n){ const hue=(i*360/Math.max(1,n))%360; return `hsl(${hue} 70% 50%)`; }
+
+    // --- Elements ---
+    const rowsEl = byId('rows');
+    const addBtn = byId('add');
+    const noteEl = byId('note');
+    const pie = byId('pie');
+    const legendEl = byId('legend');
+    const totalOut = byId('totalOut');
+
+    // --- Rows ---
+    function newRow(category='', value=''){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td><input type="text" placeholder="e.g., Stocks" value="${category}"/></td>
+        <td><input type="text" class="mono" placeholder="e.g., 50000" value="${value}"/></td>
+        <td style="text-align:right"><button class="icon-btn" title="Remove" aria-label="Remove">✕</button></td>
+      `;
+      rowsEl.appendChild(tr);
+    }
+    function seed(){ newRow('Stocks',''); newRow('Real Estate',''); newRow('Cash',''); newRow('Crypto',''); }
+
+    function getModel(){
+      const model=[];
+      [...rowsEl.querySelectorAll('tr')].forEach((tr,idx)=>{
+        const name=(tr.querySelector('td:nth-child(1) input').value.trim()||`Category ${idx+1}`);
+        const raw=tr.querySelector('td:nth-child(2) input').value;
+        const amount=parseAmount(raw);
+        if(amount>0) model.push({name,amount});
+      });
+      const total=model.reduce((a,b)=>a+b.amount,0);
+      return { total, items:model };
+    }
+
+    // --- Chart ---
+    function draw(model){
+      const ctx=pie.getContext('2d');
+      const DPR=Math.max(1,Math.floor(window.devicePixelRatio||1));
+      const W=pie.clientWidth*DPR; const H=pie.clientHeight*DPR;
+      if(pie.width!==W) pie.width=W; if(pie.height!==H) pie.height=H;
+      ctx.clearRect(0,0,W,H); ctx.save();
+
+      const items=model.items; const sum=model.total;
+      totalOut.textContent = moneyFmt(sum);
+      legendEl.innerHTML='';
+
+      if(sum<=0){
+        ctx.fillStyle='#9ca3af';
+        ctx.font=`${Math.max(14,Math.min(W,H)*0.04)}px ui-sans-serif, system-ui`;
+        ctx.textAlign='center';
+        ctx.fillText('Add category amounts to see the pie', W/2, H/2);
+        ctx.restore();
+        noteEl.textContent='';
+        return;
       }
-      save();
+
+      const cx=W/2, cy=H/2; const radius=Math.max(40,Math.min(W,H)*0.36);
+      let start=-Math.PI/2;
+
+      items.forEach((it,i)=>{
+        const frac=it.amount/sum; const end=start+frac*Math.PI*2;
+        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,radius,start,end); ctx.closePath();
+        ctx.fillStyle=hsl(i,items.length); ctx.fill();
+
+        // leader lines
+        const mid=(start+end)/2; const lx=cx+Math.cos(mid)*(radius+10); const ly=cy+Math.sin(mid)*(radius+10);
+        ctx.beginPath(); ctx.moveTo(cx+Math.cos(mid)*(radius*0.8), cy+Math.sin(mid)*(radius*0.8)); ctx.lineTo(lx,ly);
+        ctx.lineWidth=1.25; ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.stroke();
+
+        // legend
+        const li=document.createElement('div'); li.className='legend-item';
+        li.innerHTML=`<div class="swatch" style="background:${hsl(i,items.length)}"></div>
+          <div><div style="font-weight:600">${it.name}</div>
+          <div class="muted mono">${moneyFmt(it.amount)} · ${(frac*100).toFixed(1)}%</div></div>`;
+        legendEl.appendChild(li);
+
+        start=end;
+      });
+
+      // center label
+      ctx.fillStyle='#111827'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.font=`${Math.max(12,Math.min(W,H)*0.035)}px ui-sans-serif, system-ui`;
+      ctx.fillText(`Total ${moneyFmt(sum)}`, cx, cy);
+      ctx.restore();
     }
-  }
-  function currentTeam(){ sanitizeState(); return state.teams[state.currentTeamId]; }
 
-  // ===== Parsing (fixed regex) =====
-  function parseNames(raw){
-    // Split on commas or newlines, trim, drop empties
-    return String(raw||'').split(/[\,\n]+/).map(s=>s.trim()).filter(Boolean);
-  }
+    function recalc(){ draw(getModel()); }
 
-  // ===== Team Management (exposed) =====
-  function newTeam(){ const name=prompt('New team name'); if(!name) return; const id=uuid(); state.teams[id]=emptyTeam(id,name.trim()); state.currentTeamId=id; save(); renderAll(); toast('Team created','ok'); }
-  function renameTeam(){ const t=currentTeam(); if(!t) return; const name=prompt('Rename team', t.name); if(!name) return; t.name=name.trim(); save(); renderAll(); toast('Team renamed','ok'); }
-  function deleteTeam(){ const t=currentTeam(); if(!t) return; if(!confirm(`Delete team \"${t.name}\"?`)) return; delete state.teams[t.id]; const left=Object.keys(state.teams); state.currentTeamId=left[0]||null; if(!state.currentTeamId){ const id=uuid(); state.teams[id]=emptyTeam(id,'My Team'); state.currentTeamId=id; } save(); renderAll(); toast('Team deleted','ok'); }
-  window.newTeam=newTeam; window.renameTeam=renameTeam; window.deleteTeam=deleteTeam;
-  function switchTeam(id){ if(!state.teams[id]){ const first=Object.keys(state.teams)[0]||null; state.currentTeamId=first; } else { state.currentTeamId=id; } save(); renderAll(); }
+    // --- Events ---
+    addBtn.addEventListener('click', ()=>{ newRow('',''); recalc(); });
+    rowsEl.addEventListener('input',(e)=>{ if(e.target.matches('input')) recalc(); });
+    rowsEl.addEventListener('click',(e)=>{ if(e.target.closest('button')){ e.target.closest('tr').remove(); recalc(); }});
 
-  // ===== Members =====
-  function addMembersFromInput(){
-    const raw = q('#memberInput').value;
-    if (!raw || !raw.trim()) return;
-    const team = currentTeam();
-    const before = (team && team.members && team.members.length) || 0;
-    const names = parseNames(raw);
-    names.forEach(addMember);
-    const after = (currentTeam()?.members?.length)||0;
-    if (after > before) { updateOrderVisibility(); }
-    q('#memberInput').value = '';
-    q('#memberInput').focus();
-  }
-  function addMember(name){
-    name=(name||'').trim(); if(!name) return;
-    const t=currentTeam(); if(!t) return;
-    if(!Array.isArray(t.members)) t.members=[];
-    if(t.members.some(m=>m.name.toLowerCase()===name.toLowerCase())){ toast('Already there'); return; }
-    t.members.push({id:uuid(), name, present:true}); save(); autoOrder(); renderMembers(); renderQueue();
-  }
-  function removeMember(id){ const t=currentTeam(); if(!t) return; t.members=(t.members||[]).filter(m=>m.id!==id); if(t.order?.list) t.order.list=t.order.list.filter(x=>x!==id); save(); autoOrder(); renderAll(); toast('Removed','ok'); }
-  function togglePresent(id){ const t=currentTeam(); if(!t) return; const m=(t.members||[]).find(x=>x.id===id); if(!m) return; m.present=!m.present; save(); autoOrder(); renderMembers(); renderQueue(); }
+    // Init
+    seed(); recalc();
 
-  // NOTE: Important: do NOT auto-correct invalid team here; tests expect [].
-  function getPresentIds(){
-    const id = state.currentTeamId;
-    const team = (id && state.teams && state.teams[id]) ? state.teams[id] : null;
-    if(!team || !Array.isArray(team.members)) return [];
-    return team.members.filter(m=>m.present).map(m=>m.id);
-  }
-
-  // ===== Order (leader on top, avoid repeating yesterday's leader) =====
-  function randomizeOrder(opts={}){
-    const t=currentTeam(); if(!t) return [];
-    const ids=getPresentIds();
-    if(ids.length===0){ t.order={date:'',list:[],roles:{},firstHistory:t.order?.firstHistory||{}}; save(); return []; }
-    const date=todayISO();
-    const deterministic = !opts.forceRandom && !!(t.options?.deterministic);
-    // avoid same leader as yesterday
-    let candidates = ids.slice();
-    if(t.options?.avoidRepeatFirst){
-      const y=new Date(date); y.setDate(y.getDate()-1);
-      const yISO=y.toISOString().slice(0,10);
-      const yFirst=t.order.firstHistory?.[yISO];
-      if(yFirst){ const filtered=candidates.filter(id=>id!==yFirst); if(filtered.length) candidates=filtered; }
-    }
-    // pick leader
-    let leader;
-    if(deterministic){ leader = shuffleDeterministic(candidates, strHash('leader|'+date+'|'+t.id))[0]; }
-    else { leader = candidates[Math.floor(Math.random()*candidates.length)]; }
-    // order the rest
-    const rest = ids.filter(id=>id!==leader);
-    const restOrder = deterministic ? shuffleDeterministic(rest, strHash(date+'|'+t.id)) : shuffleRandom(rest);
-    let arr = [leader, ...restOrder];
-    // Anti-stall
-    const prev = Array.isArray(t.order?.list)? t.order.list.slice(): [];
-    if(opts.forceRandom && prev.length>1 && JSON.stringify(prev)===JSON.stringify(arr)){
-      [arr[0], arr[1]] = [arr[1], arr[0]];
-    }
-    // persist
-    t.order.firstHistory ||= {}; t.order.firstHistory[date]=arr[0]; t.order.date=date; t.order.list=arr; save();
-    return arr;
-  }
-  function shuffleDeterministic(arr,seed){ const rnd=mulberry32(seed); const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a }
-  function shuffleRandom(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a }
-  function autoOrder(){ const t=currentTeam(); if(!t) return; const d=todayISO(); const present=getPresentIds(); if(t.order.date!==d || !t.order.list || t.order.list.length!==present.length || !present.every(id=>t.order.list.includes(id))){ randomizeOrder(); } }
-
-  // ===== Manual notes (per‑day, per‑team) =====
-  function ensureNotesDaily(date){ const t=currentTeam(); if(!t.notesDaily) t.notesDaily={}; if(!(date in t.notesDaily)) t.notesDaily[date]=''; return t.notesDaily; }
-  function renderNotesSection(){
-    const t=currentTeam(); if(!t) return;
-    const date=t.order?.date||todayISO(); ensureNotesDaily(date);
-    const toggle=q('#notesToggle'); const wrap=q('#notesWrap'); const area=q('#notesArea');
-    if(!toggle||!wrap||!area) return;
-    // show if user opted in or there is existing text
-    const want = !!(t.options && t.options.takeNotes);
-    toggle.checked = want || (t.notesDaily[date] && t.notesDaily[date].trim().length>0);
-    wrap.classList.toggle('hidden', !toggle.checked);
-    area.value = t.notesDaily[date] || '';
-  }
-  const saveNotesDebounced = (function(){ let to; return function(){ clearTimeout(to); to=setTimeout(()=>{ const t=currentTeam(); if(!t) return; const date=t.order?.date||todayISO(); ensureNotesDaily(date); const area=q('#notesArea'); t.notesDaily[date] = (area?.value||''); save(); }, 250); }; })();
-
-  function doShuffle(){
-    const arr = randomizeOrder({forceRandom:true});
-    if(!arr.length){ toast('No present members','error'); return; }
-    renderQueue();
-    renderNotesSection();
-    const t=currentTeam(); if(!t) return;
-    const leaderId=arr[0];
-    const leaderName=(t.members||[]).find(m=>m.id===leaderId)?.name||'Leader';
-    toast(`Leader: ${leaderName}`,'ok');
-  }
-
-  // ===== Visibility helpers =====
-  function shouldShowOrder(){ const t=currentTeam(); return !!(t && Array.isArray(t.members) && t.members.length>0); }
-  function updateOrderVisibility(){ const card=document.getElementById('orderCard'); if(!card) return; card.classList.toggle('hidden', !shouldShowOrder()); }
-
-  // ===== Render =====
-  function renderTeams(){ const sel=q('#teamSelect'); if(!sel) return; sel.innerHTML=''; const ids=Object.keys(state.teams||{}); if(!state.currentTeamId||!state.teams[state.currentTeamId]){ state.currentTeamId=ids[0]||state.currentTeamId; sanitizeState(); }
-    Object.keys(state.teams).forEach(id=>{ const t=state.teams[id]; const opt=document.createElement('option'); opt.value=t.id; opt.textContent=t.name; opt.selected=(t.id===state.currentTeamId); sel.appendChild(opt); }); }
-  function renderMembers(){ const wrap=q('#memberChips'); if(!wrap) return; wrap.innerHTML=''; const t=currentTeam(); if(!t) return; (t.members||[]).forEach(m=>{ const d=document.createElement('div'); d.className=`chip inline-flex items-center px-2 py-1 rounded-lg border ${m.present?'bg-slate-100 text-slate-800 border-slate-200':'bg-white text-slate-400 border-slate-200 line-through opacity-70'}`; d.setAttribute('data-id', m.id); d.innerHTML=`<span class="text-sm select-none">${escapeHtml(m.name)}</span>`; const x=document.createElement('button'); x.className='chip-x ml-1'; x.title=`Remove ${m.name}`; x.innerHTML='✕'; x.addEventListener('click', (ev)=>{ ev.stopPropagation(); removeMember(m.id); }); d.addEventListener('click', ()=> togglePresent(m.id)); d.appendChild(x); wrap.appendChild(d); }); }
-  function renderQueue(){
-    const t=currentTeam(); if(!t) return;
-    const listEl=q('#queueList'); if(!listEl) return; listEl.innerHTML='';
-    const list=t.order?.list||[];
-    const lbl=document.getElementById('todayLabel'); if(lbl) lbl.textContent = t.order?.date ? `For ${t.order.date}` : '—';
-    list.forEach((id,idx)=>{
-      const m=(t.members||[]).find(x=>x.id===id); if(!m) return;
-      const li=document.createElement('li');
-      const isLeader = idx===0;
-      li.innerHTML = `<a id="member-${id}" href="#member-${id}" class="block px-3 py-2 text-sm ${isLeader? 'bg-blue-50 font-semibold text-blue-900' : 'hover:bg-slate-50'}">
-          <span>${escapeHtml(m.name)}</span>
-          ${isLeader? '<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 align-middle">Leader</span>':''}
-        </a>`;
-      listEl.appendChild(li);
-    });
-  }
-  function renderAll(){
-    sanitizeState();
-    renderTeams();
-    renderMembers();
-    updateOrderVisibility();
-    if (shouldShowOrder()) { autoOrder(); renderQueue(); renderNotesSection(); }
-    const lbl=document.getElementById('todayLabel'); if(lbl) lbl.textContent=`For ${todayISO()}`;
-  }
-
-  // ===== Self-tests =====
-  function assertEq(name, got, expected){ const g = JSON.stringify(got); const e = JSON.stringify(expected); if(g!==e) throw new Error(`${name}: expected ${e} but got ${g}`); }
-  function runSelfTests(){
-    const backup = JSON.stringify(state);
-    try{
-      // parser tests
-      assertEq('parseNames commas', parseNames('Alice, Bob, Charlie'), ['Alice','Bob','Charlie']);
-      assertEq('parseNames newlines', parseNames('Alice\nBob\nCharlie'), ['Alice','Bob','Charlie']);
-      assertEq('parseNames mix', parseNames(' Alice,\n Bob , Charlie '), ['Alice','Bob','Charlie']);
-      assertEq('parseNames empties', parseNames(',\n, ,A,,\n'), ['A']);
-
-      // visibility with no team
-      const s0 = JSON.parse(backup);
-      s0.currentTeamId = null; s0.teams = {}; state = s0; save(); sanitizeState();
-      if(!currentTeam()) throw new Error('sanitizeState did not create default team');
-      assertEq('shouldShowOrder false on empty', shouldShowOrder(), false);
-
-      // corrupted currentTeamId → should not throw and present ids []
-      const s1 = JSON.parse(backup); state = s1; save(); sanitizeState();
-      const badId = 'missing-'+uuid(); state.currentTeamId = badId; save();
-      assertEq('present ids when id missing', getPresentIds(), []);
-
-      // avoid-yesterday-leader
-      const origId = state.currentTeamId; const tid1 = 'test1-'+uuid(); state.teams[tid1]=emptyTeam(tid1,'_t1'); state.currentTeamId=tid1;
-      ['A','B','C'].forEach(n=>state.teams[tid1].members.push({id:'m'+n,name:n,present:true}));
-      const y=new Date(); y.setDate(y.getDate()-1); const yISO=y.toISOString().slice(0,10);
-      state.teams[tid1].order={date:todayISO(), list:['mA','mB','mC'], roles:{}, firstHistory:{}};
-      state.teams[tid1].order.firstHistory[yISO]='mB';
-      const arr1 = randomizeOrder({forceRandom:true}); if(arr1[0]==='mB') throw new Error('Yesterday\'s leader reused');
-      state.currentTeamId = origId;
-
-      // anti-stall
-      const tid2 = 'test2-'+uuid(); state.teams[tid2]=emptyTeam(tid2,'_t2'); state.currentTeamId=tid2;
-      ['A','B','C'].forEach(n=>state.teams[tid2].members.push({id:'m'+n,name:n,present:true}));
-      state.teams[tid2].order={date:todayISO(), list:['mA','mB','mC'], roles:{}, firstHistory:{}}; save();
-      const oldRand=Math.random; Math.random=()=>0; const newArr=randomizeOrder({forceRandom:true}); Math.random=oldRand;
-      if(JSON.stringify(newArr)==='["mA","mB","mC"]') throw new Error('Anti-stall failed');
-
-      // single member
-      const tid3='test3-'+uuid(); state.teams[tid3]=emptyTeam(tid3,'_t3'); state.currentTeamId=tid3; state.teams[tid3].members.push({id:'mX',name:'X',present:true});
-      assertEq('single member leader', randomizeOrder({forceRandom:true}), ['mX']);
-
-      // notesDaily storage
-      const tid4='test4-'+uuid(); state.teams[tid4]=emptyTeam(tid4,'_t4'); state.currentTeamId=tid4; const d=todayISO();
-      state.teams[tid4].notesDaily[d] = 'hello';
-      assertEq('notesDaily saved', state.teams[tid4].notesDaily[d], 'hello');
-
-      console.log('Self-tests passed');
-    } catch(err){ console.error(err); toast('Self-test failed: '+err.message, 'error'); }
-    finally { try{ state = JSON.parse(backup); save(); }catch(_){} }
-  }
-
-  // ===== Events & shortcuts =====
-  function bindEvents(){
-    q('#teamSelect')?.addEventListener('change', (e)=> switchTeam(e.target.value));
-    q('#memberInput')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addMembersFromInput(); }});
-    document.getElementById('shuffleBtn')?.addEventListener('click', doShuffle);
-    document.getElementById('todayLabel')?.addEventListener('click', doShuffle);
-    // notes
-    q('#notesToggle')?.addEventListener('change', (e)=>{ const t=currentTeam(); if(!t) return; t.options = t.options||{}; t.options.takeNotes = !!e.target.checked; save(); renderNotesSection(); if(e.target.checked){ q('#notesArea')?.focus(); }});
-    q('#notesArea')?.addEventListener('input', saveNotesDebounced);
-
-    document.addEventListener('keydown', (e)=>{
-      if(e.key && e.key.toLowerCase()==='s'){ e.preventDefault(); doShuffle(); }
-      else if(e.ctrlKey && e.key.toLowerCase()==='n'){ e.preventDefault(); newTeam(); }
-      else if(e.key==='F2'){ e.preventDefault(); renameTeam(); }
-      else if(e.key==='Delete'){ e.preventDefault(); deleteTeam(); }
-    });
-  }
-
-  // ===== Init =====
-  load();          // load + sanitize
-  runSelfTests();  // now safe to mutate/restore
-  bindEvents();
-  renderAll();
-</script>
+    // Resize handling for crisp canvas
+    let raf; window.addEventListener('resize',()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(recalc); });
+  </script>
 </body>
 </html>
